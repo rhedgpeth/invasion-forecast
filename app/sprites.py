@@ -1,58 +1,63 @@
-"""Turn FLUX paintings into game art: cut the alien out of its flat backdrop, shrink both to arcade size."""
-from collections import deque
+"""Turn FLUX paintings into game art.
+
+Aliens: FLUX paints each alien as a black stencil on white, with its eyes as holes. That makes the cut-out
+trivial (dark = alien) and gives the classic arcade look: one flat colour, gaps for eyes. Code then shrinks it
+to a 16x16 grid, makes it symmetric, and colours it by its planet's climate.
+
+Skyline: FLUX paints a square scene; we keep a wide band with the skyline along the bottom.
+"""
 from io import BytesIO
 
 from PIL import Image
 
-SPRITE_PX = 64
+GRID = 16  # a sprite is 16x16 big, square pixels; the game draws it scaled up
 BACKGROUND_PX = (320, 200)  # the game scales this up with crisp, square pixels
-WORK_PX = 256  # cut-outs are done at this size: fast, and plenty for a 64 px sprite
-TOLERANCE = 70  # how far (sum of RGB differences) a pixel can be from the backdrop and still count as backdrop
+WORK_PX = 256
+DARK = 110  # 0-255 brightness below which a pixel counts as stencil
+MIN_COVERAGE = 0.03
 
 
 class BadSprite(Exception):
-    """The painting can't be used as a sprite: it touches the edges (e.g. a painted floor) or is empty."""
+    """The painting can't be used as a sprite: nothing on it, or the shape runs off the edge (e.g. a floor)."""
 
 
-def cut_out(png: bytes) -> bytes:
-    img = Image.open(BytesIO(png)).convert("RGB").resize((WORK_PX, WORK_PX), Image.NEAREST)
-    backdrop = _backdrop_colour(img)
-    sprite = img.convert("RGBA")
-    src, out = img.load(), sprite.load()
+def cut_out(png: bytes, colour: str) -> bytes:
+    """Black-on-white painting → 16x16 symmetric sprite in `colour` (see rules.sprite_colour)."""
+    grey = Image.open(BytesIO(png)).convert("L").resize((WORK_PX, WORK_PX), Image.LANCZOS)
+    stencil = grey.point(lambda v: 255 if v < DARK else 0)
 
-    # 1. Flood-fill the backdrop inwards from the edges (also takes its darker shades: cast shadows).
-    seen, queue = set(), deque((x, y) for x in range(WORK_PX) for y in (0, WORK_PX - 1))
-    queue.extend((x, y) for y in range(WORK_PX) for x in (0, WORK_PX - 1))
-    while queue:
-        x, y = queue.popleft()
-        if (x, y) in seen or not (0 <= x < WORK_PX and 0 <= y < WORK_PX):
-            continue
-        seen.add((x, y))
-        if _is_backdrop(src[x, y], backdrop):
-            out[x, y] = (0, 0, 0, 0)
-            queue.extend(((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)))
-
-    # 2. Green-screen rule for everything the fill missed: pockets between legs, shadows, coloured fringes.
-    #    Safe because the backdrop is chosen to contrast with the alien (rules.backdrop_for)
-    #    and the LLM is told never to use green or magenta.
-    remove_screen_colour(sprite, "green" if backdrop[1] > max(backdrop[0], backdrop[2]) else "magenta")
-
-    box = sprite.getbbox()
-    if box is None or _coverage(sprite) < 0.03:
-        raise BadSprite("nothing left after removing the backdrop")
+    box = stencil.getbbox()
+    if box is None or 1 - stencil.histogram()[0] / WORK_PX**2 < MIN_COVERAGE:
+        raise BadSprite("nothing on the painting")
     if box[0] < 2 or box[1] < 2 or box[2] > WORK_PX - 2 or box[3] > WORK_PX - 2:
-        raise BadSprite("the alien touches the edge of the painting")
+        raise BadSprite("the shape runs off the edge of the painting")
 
-    # 3. Crop, centre on a square canvas, shrink.
-    alien = sprite.crop(box)
-    side = max(alien.size)
-    square = Image.new("RGBA", (side, side))
-    square.paste(alien, ((side - alien.width) // 2, side - alien.height))
-    return _png(square.resize((SPRITE_PX, SPRITE_PX), Image.NEAREST))
+    # Centre the shape on a square, shrink it to the grid, keep cells that are at least half stencil.
+    shape = stencil.crop(box)
+    side = max(shape.size)
+    square = Image.new("L", (side, side))
+    square.paste(shape, ((side - shape.width) // 2, (side - shape.height) // 2))
+    cells = square.resize((GRID, GRID), Image.BOX).load()
+
+    # Classic arcade sprites are symmetric: a cell is filled if it or its mirror image is.
+    filled = [[cells[x, y] >= 128 or cells[GRID - 1 - x, y] >= 128 for x in range(GRID)] for y in range(GRID)]
+    # FLUX sometimes stands the alien on a ground line: drop solid bars along the bottom.
+    while filled and sum(filled[-1]) >= GRID * 0.75:
+        filled.pop()
+    if not any(map(any, filled)):
+        raise BadSprite("nothing left once the ground line is removed")
+
+    sprite = Image.new("RGBA", (GRID, GRID))
+    px, rgba, top = sprite.load(), _rgba(colour), GRID - len(filled)  # keep it sitting on the bottom edge
+    for y, row in enumerate(filled):
+        for x, on in enumerate(row):
+            if on:
+                px[x, y + top] = rgba
+    return _png(sprite)
 
 
 def background(png: bytes) -> bytes:
-    """FLUX paints a square. Keep a wide band with the skyline at the bottom, then shrink to arcade size."""
+    """Keep a wide band of the square painting with the skyline at the bottom, shrunk to arcade size."""
     img = Image.open(BytesIO(png)).convert("RGB")
     w, h = img.size
     band = round(w * BACKGROUND_PX[1] / BACKGROUND_PX[0])
@@ -60,41 +65,8 @@ def background(png: bytes) -> bytes:
     return _png(img.crop((0, top, w, top + band)).resize(BACKGROUND_PX, Image.LANCZOS))
 
 
-def _backdrop_colour(img: Image.Image) -> tuple:
-    px = img.load()
-    n = img.width - 3
-    corners = [px[2, 2], px[n, 2], px[2, n], px[n, n]]
-    return tuple(sorted(c[i] for c in corners)[1] for i in range(3))  # per-channel, ignores one odd corner
-
-
-def _is_backdrop(c: tuple, backdrop: tuple) -> bool:
-    if _distance(c, backdrop) < TOLERANCE:
-        return True
-    ratios = [a / max(1, b) for a, b in zip(c, backdrop)]
-    return 0.35 < max(ratios) < 1.05 and max(ratios) - min(ratios) < 0.35  # a darker shade of it: a shadow
-
-
-def remove_screen_colour(sprite: Image.Image, screen: str) -> None:
-    """Clear every pixel where the screen colour dominates, at any brightness (so shadows go too)."""
-    px = sprite.load()
-    for y in range(sprite.height):
-        for x in range(sprite.width):
-            r, g, b, a = px[x, y]
-            if not a:
-                continue
-            if screen == "green" and g > r + 25 and g > b + 15:
-                px[x, y] = (0, 0, 0, 0)
-            elif screen == "magenta" and r > g + 60 and b > g + 40:
-                px[x, y] = (0, 0, 0, 0)
-
-
-def _distance(c: tuple, backdrop: tuple) -> int:
-    return sum(abs(a - b) for a, b in zip(c, backdrop))
-
-
-def _coverage(img: Image.Image) -> float:
-    transparent = img.getchannel("A").histogram()[0]
-    return 1 - transparent / (img.width * img.height)
+def _rgba(hex_colour: str) -> tuple:
+    return tuple(int(hex_colour[i:i + 2], 16) for i in (1, 3, 5)) + (255,)
 
 
 def _png(img: Image.Image) -> bytes:

@@ -18,7 +18,7 @@ class Wave:
     climate: str  # "frozen" … "molten": what the LLM is told, instead of raw kelvin
     hits: int  # shots needed to destroy one alien
     speed: float  # how fast the formation marches (1.0 = normal)
-    backdrop: str  # colour FLUX paints behind the alien, chosen to contrast with it, so it cuts out cleanly
+    colour: str  # the sprite's colour, from its climate
 
 
 def pick_waves(planets: list[Planet]) -> list[Wave]:
@@ -33,7 +33,7 @@ def pick_waves(planets: list[Planet]) -> list[Wave]:
 def make_wave(number: int, planet: Planet, is_boss: bool) -> Wave:
     feel = climate(planet.temp_k)
     return Wave(number, is_boss, planet, feel, hits_for(planet.radius_earths, is_boss),
-                speed_for(planet.year_days), backdrop_for(feel))
+                speed_for(planet.year_days), sprite_colour(feel))
 
 
 def climate(temp_k: float) -> str:
@@ -69,8 +69,14 @@ def speed_for(year_days: float | None) -> float:
     return 0.8
 
 
-def backdrop_for(climate_word: str) -> str:
-    return "bright green" if climate_word in ("hot", "scorching", "molten") else "bright magenta"
+SPRITE_COLOURS = {  # cold worlds are blues, hot worlds run yellow → red
+    "frozen": "#6FD6FF", "icy": "#B5ECFF", "temperate": "#FFE066",
+    "hot": "#FFA23A", "scorching": "#FF6A3D", "molten": "#FF3B3B",
+}
+
+
+def sprite_colour(climate_word: str) -> str:
+    return SPRITE_COLOURS[climate_word]
 
 
 def time_of_day(local_time: str, is_day: bool) -> str:

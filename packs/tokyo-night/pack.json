@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "created": "2026-11-05T18:59:52+00:00",
+  "created": "2026-11-05T19:26:53+00:00",
   "city": {
     "name": "Tokyo",
     "region": "Tokyo",
@@ -9,10 +9,10 @@
     "lon": 139.69171
   },
   "sky": {
-    "local_time": "2026-11-06T03:45",
+    "local_time": "2026-11-06T04:15",
     "time_of_day": "night",
     "condition": "overcast",
-    "temp_c": 14.0,
+    "temp_c": 14.2,
     "is_day": false
   },
   "skyline": "skyline.png",
@@ -20,8 +20,8 @@
     {
       "number": 1,
       "boss": false,
-      "species": "Frizorak",
-      "look": "The Frizorak is a pale blue, spindly creature with large, glowing amber eyes and crystalline appendages that shimmer with frost.",
+      "species": "Frozoraak",
+      "look": "Round head with two large eyes, two long antennae, and four short, stubby legs, with a wide, flat body.",
       "climate": "frozen",
       "hits": 2,
       "speed": 0.8,
@@ -33,33 +33,37 @@
         "radius_earths": 3.87,
         "year_days": 1219.0,
         "light_years": 31,
-        "altitude_deg": 70.2
-      }
+        "altitude_deg": 66.5
+      },
+      "bio": "Frozoraak, ice-hearted explorer from a 56 K frozen world, melts into the Tokyo night, loving the overcast chill.",
+      "colour": "#6FD6FF"
     },
     {
       "number": 2,
       "boss": false,
-      "species": "Blazorn",
-      "look": "The Blazorn is a fiery orange, round-bodied creature with glowing yellow eyes and molten red tendrils extending from its back.",
+      "species": "Scorchkin",
+      "look": "Triangular head with two glowing eyes, two short horns, and six spindly legs, with a tapering, flame-like body.",
       "climate": "hot",
       "hits": 1,
       "speed": 1.3,
       "sprite": "alien-2.png",
       "planet": {
-        "name": "TOI-1235 b",
-        "star": "TOI-1235",
-        "temp_k": 775.0,
-        "radius_earths": 1.69,
-        "year_days": 3.444714,
-        "light_years": 129,
-        "altitude_deg": 49.2
-      }
+        "name": "K2-122 b",
+        "star": "K2-122",
+        "temp_k": 769.0,
+        "radius_earths": 1.16,
+        "year_days": 2.2193023,
+        "light_years": 235,
+        "altitude_deg": 72.3
+      },
+      "bio": "Scorchkin, fiery wanderer of a 769 K scorched planet, shivers in Tokyo\u2019s 14\u00b0C fog, craving a hot spring.",
+      "colour": "#FFA23A"
     },
     {
       "number": 3,
       "boss": true,
       "species": "Moltenox",
-      "look": "The Moltenox is a deep red, armored creature with glowing white eyes and thick, black metallic limbs that crackle with heat.",
+      "look": "Ovoid head with three small eyes, two thick, molten horns, and four thick, muscular legs, with a wide, rocky body full of jagged spikes.",
       "climate": "molten",
       "hits": 20,
       "speed": 1.0,
@@ -71,8 +75,10 @@
         "radius_earths": 12.1,
         "year_days": null,
         "light_years": 445,
-        "altitude_deg": 54.8
-      }
+        "altitude_deg": 49.3
+      },
+      "bio": "Moltenox, lava-born titan from a 2601 K molten world, roars at Tokyo\u2019s drizzle, longing for a real downpour.",
+      "colour": "#FF3B3B"
     }
   ],
   "nasa_source": "live",
@@ -82,33 +88,33 @@
       "label": "Read the sky",
       "status": "done",
       "detail": "Tokyo: night, overcast, 14\u00b0C",
-      "seconds": 1.5,
+      "seconds": 1.4,
       "cost_usd": 0.0
     },
     {
       "key": "planets",
       "label": "Find the planets overhead",
       "status": "done",
-      "detail": "644 planets overhead (live NASA data)",
-      "seconds": 1.3,
+      "detail": "654 planets overhead (live NASA data)",
+      "seconds": 1.6,
       "cost_usd": 0.0
     },
     {
       "key": "species",
       "label": "Imagine the species",
       "status": "done",
-      "detail": "Qwen3 32B: Frizorak, Blazorn, Moltenox",
-      "seconds": 6.5,
-      "cost_usd": 0.0048
+      "detail": "Qwen3 32B: Frozoraak, Scorchkin, Moltenox",
+      "seconds": 8.2,
+      "cost_usd": 0.0053
     },
     {
       "key": "art",
       "label": "Paint the art",
       "status": "done",
       "detail": "FLUX: 4 of 4 painted",
-      "seconds": 49.0,
+      "seconds": 29.0,
       "cost_usd": 0.012
     }
   ],
-  "cost_usd": 0.0168
+  "cost_usd": 0.0173
 }

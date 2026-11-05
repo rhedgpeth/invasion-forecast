@@ -36,10 +36,14 @@ def fake_http(routes: dict) -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=httpx.MockTransport(handle))
 
 
-def painting(alien_box=(80, 80, 176, 176), backdrop=(220, 35, 96), alien=(40, 90, 230)) -> bytes:
-    """A fake FLUX painting: a flat backdrop with a solid oval 'alien' on it."""
-    img = Image.new("RGB", (256, 256), backdrop)
-    ImageDraw.Draw(img).ellipse(alien_box, fill=alien)
+def painting(alien_box=(80, 80, 176, 176), eyes: bool = True) -> bytes:
+    """A fake FLUX stencil: a black oval 'alien' on white, with two white eye holes."""
+    img = Image.new("RGB", (256, 256), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse(alien_box, fill=(0, 0, 0))
+    if eyes:
+        draw.rectangle((104, 112, 116, 124), fill=(255, 255, 255))
+        draw.rectangle((140, 112, 152, 124), fill=(255, 255, 255))
     buf = BytesIO()
     img.save(buf, "PNG")
     return buf.getvalue()

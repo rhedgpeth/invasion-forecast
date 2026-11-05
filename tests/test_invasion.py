@@ -88,7 +88,7 @@ async def test_a_sprite_that_cannot_be_cut_out_is_repainted_once():
     alien_paintings = []
 
     def flux(request):
-        if b"alien invader" not in request.content:
+        if b"alien icon" not in request.content:
             return 200, {"status": "COMPLETED", "output": {"result": IMAGE_URL, "cost": 0.003}}
         alien_paintings.append(1)
         url = IMAGE_URL + ("?floor" if len(alien_paintings) == 1 else "")  # the first alien comes with a floor

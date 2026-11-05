@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "created": "2026-11-05T19:03:27+00:00",
+  "created": "2026-11-05T19:29:10+00:00",
   "city": {
     "name": "Nixa",
     "region": "Missouri",
@@ -9,10 +9,10 @@
     "lon": -93.29435
   },
   "sky": {
-    "local_time": "2026-11-05T13:00",
+    "local_time": "2026-11-05T13:15",
     "time_of_day": "afternoon",
     "condition": "clear",
-    "temp_c": 18.4,
+    "temp_c": 18.7,
     "is_day": true
   },
   "skyline": "skyline.png",
@@ -20,27 +20,29 @@
     {
       "number": 1,
       "boss": false,
-      "species": "Frostspire",
-      "look": "This tall, slender alien has a shimmering white and light blue crystalline body, glowing amber eyes, and delicate, spindly limbs that resemble ice shards.",
+      "species": "Frostskull",
+      "look": "Triangular head with two large eyes, two long antennae, and four spindly legs.",
       "climate": "frozen",
       "hits": 4,
       "speed": 0.8,
       "sprite": "alien-1.png",
       "planet": {
-        "name": "HD 105618 c",
-        "star": "HD 105618",
-        "temp_k": 51.64,
-        "radius_earths": 11.9,
-        "year_days": 77114.07158,
-        "light_years": 229,
-        "altitude_deg": 34.3
-      }
+        "name": "HD 145675 c",
+        "star": "14 Her",
+        "temp_k": 55.51,
+        "radius_earths": 12.6,
+        "year_days": 15732.45889,
+        "light_years": 58,
+        "altitude_deg": 83.1
+      },
+      "bio": "Frostskull, ice-hearted giant from a frigid 56 K world, grins at Nixa's chill afternoon like a frozen smile.",
+      "colour": "#6FD6FF"
     },
     {
       "number": 2,
       "boss": false,
-      "species": "Scorchveil",
-      "look": "This bulky, rounded alien has a fiery orange and red molten surface with glowing yellow veins, large black pupil-less eyes, and stubby, thick limbs.",
+      "species": "Blazehorn",
+      "look": "Round head with two glowing eyes, two curved horns, and six thick, stubby legs.",
       "climate": "hot",
       "hits": 2,
       "speed": 1.3,
@@ -52,63 +54,67 @@
         "radius_earths": 2.22999162,
         "year_days": 9.23786144195,
         "light_years": 561,
-        "altitude_deg": 61.6
-      }
+        "altitude_deg": 62.3
+      },
+      "bio": "Blazehorn, fiery and bright, hails from a 768 K blaze-world\u2014Nixa's clear skies are just a warm-up act for him.",
+      "colour": "#FFA23A"
     },
     {
       "number": 3,
       "boss": true,
-      "species": "Blazehelm",
-      "look": "This towering, angular alien has a metallic gold and bright red armored body, glowing white eyes, and short, powerful limbs with jagged edges.",
+      "species": "Moltenclaw",
+      "look": "Oval head with two small eyes, no antennae, two large clawed limbs, and a spiked tail.",
       "climate": "molten",
       "hits": 20,
       "speed": 1.6,
       "sprite": "alien-3.png",
       "planet": {
-        "name": "KELT-9 b",
-        "star": "KELT-9",
-        "temp_k": 3921.0,
-        "radius_earths": 21.70058664,
-        "year_days": 1.4811235,
-        "light_years": 667,
-        "altitude_deg": 36.4
-      }
+        "name": "TOI-2109 b",
+        "star": "TOI-2109",
+        "temp_k": 3646.0,
+        "radius_earths": 15.098497,
+        "year_days": 0.67247414,
+        "light_years": 855,
+        "altitude_deg": 68.0
+      },
+      "bio": "Moltenclaw, a molten titan from 3646 K, basks in Nixa's mild 19\u00b0C like it's a cozy campfire.",
+      "colour": "#FF3B3B"
     }
   ],
-  "nasa_source": "snapshot",
+  "nasa_source": "live",
   "steps": [
     {
       "key": "sky",
       "label": "Read the sky",
       "status": "done",
-      "detail": "Nixa: afternoon, clear, 18\u00b0C",
-      "seconds": 1.4,
+      "detail": "Nixa: afternoon, clear, 19\u00b0C",
+      "seconds": 1.3,
       "cost_usd": 0.0
     },
     {
       "key": "planets",
       "label": "Find the planets overhead",
-      "status": "fallback",
-      "detail": "NASA unavailable: 3504 overhead from the saved catalogue",
-      "seconds": 8.2,
+      "status": "done",
+      "detail": "3358 planets overhead (live NASA data)",
+      "seconds": 2.5,
       "cost_usd": 0.0
     },
     {
       "key": "species",
       "label": "Imagine the species",
       "status": "done",
-      "detail": "Qwen3 32B: Frostspire, Scorchveil, Blazehelm",
-      "seconds": 7.3,
-      "cost_usd": 0.005
+      "detail": "Qwen3 32B: Frostskull, Blazehorn, Moltenclaw",
+      "seconds": 7.5,
+      "cost_usd": 0.0052
     },
     {
       "key": "art",
       "label": "Paint the art",
       "status": "done",
       "detail": "FLUX: 4 of 4 painted",
-      "seconds": 37.7,
+      "seconds": 45.0,
       "cost_usd": 0.012
     }
   ],
-  "cost_usd": 0.017
+  "cost_usd": 0.0172
 }

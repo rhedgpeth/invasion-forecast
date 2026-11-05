@@ -28,9 +28,10 @@ SKYLINE_PROMPT = (
     "open sky. Retro arcade style, limited palette, crisp pixels. No text, no signs, no lettering anywhere."
 )
 ALIEN_PROMPT = (
-    "16-bit pixel art sprite of a single compact alien invader for a retro arcade shooter: {look} "
-    "Front view, symmetrical, bold silhouette, whole body visible with empty space around it, "
-    "on a flat solid {backdrop} background. No ground, no shadow, no particles, no glow, no text."
+    "A simple 8-bit arcade game alien icon, drawn as one solid black silhouette on a plain white background: "
+    "{look} Wide and squat, chunky square pixels, perfectly symmetrical, seen from the front. Its eyes are "
+    "white holes in the silhouette. Small, centred and floating in the air, with plenty of white space around it. "
+    "No ground, no floor line, no shadow, no colour, no text."
 )
 NEGATIVE_PROMPT = "text, letters, words, signs, logo, watermark, user interface, people, border, frame, ground, shadow"
 
@@ -135,11 +136,11 @@ async def paint_all(http, settings, place, now, waves: list[Wave], story: dict, 
 
     async def alien(wave: Wave, look: str) -> bytes:
         nonlocal cost
-        prompt = ALIEN_PROMPT.format(look=look, backdrop=wave.backdrop)
+        prompt = ALIEN_PROMPT.format(look=look)
         for _ in range(2):  # one repaint if the first attempt can't be cut out cleanly
             art = await runpod_ai.paint(http, key, prompt, NEGATIVE_PROMPT, random.randrange(2**31), time_left())
             try:
-                sprite = sprites.cut_out(art.png)
+                sprite = sprites.cut_out(art.png, wave.colour)
             except sprites.BadSprite:
                 cost += art.cost_usd  # a rejected painting still costs money
                 continue
@@ -163,13 +164,17 @@ def story_prompt(place: sky.Place, now: sky.Sky, waves: list[Wave]) -> str:
         f"City: {place.name}, {place.region}, {place.country}. Right now it is "
         f"{rules.time_of_day(now.local_time, now.is_day)} there, {now.condition}, {now.temp_c:.0f}°C.\n"
         f"The invaders come from these real planets, in order:\n{worlds}\n"
-        'Reply with ONLY this JSON: {"skyline": "...", "aliens": [{"species": "...", "look": "..."}]}, '
+        'Reply with ONLY this JSON: {"skyline": "...", "aliens": [{"species": "...", "look": "...", "bio": "..."}]}, '
         "one alien per planet, in the same order.\n"
         "skyline: one sentence describing the shapes of this city's skyline seen side-on from far away, at this time "
         "of day and in this weather. Buildings and landmarks only; no signs, no lettering.\n"
-        "species: an invented two-word name.\n"
-        "look: one sentence of visual traits for a compact creature that suits its world (colours, body shape, eyes, "
-        "limbs). Use bright colours, but never green or magenta. No real brands, franchises or characters."
+        "species: an invented name, different for every alien.\n"
+        "bio: one playful sentence for the alien's character card, under 25 words, built on its real planet facts "
+        "(temperature, size, distance) with a nod to the city's weather right now. Mention only the weather given "
+        "above; never invent rain, fog or snow.\n"
+        "look: one short sentence describing a simple, iconic silhouette that suits its world and would still read as "
+        "a tiny 16x16 arcade icon. It must be wider than it is tall. Name the head shape, number of eyes, antennae, "
+        "horns, spikes, legs or tentacles. Shapes only, no colours. No real brands, franchises or characters."
     )
 
 
@@ -177,24 +182,27 @@ def parse_story(text: str, count: int) -> dict:
     story = json.loads(text[text.find("{"): text.rfind("}") + 1])
     if not isinstance(story.get("skyline"), str) or len(story.get("aliens", [])) < count:
         raise ValueError("the LLM's answer was missing parts")
-    story["aliens"] = [{"species": str(a["species"])[:40], "look": str(a["look"])[:300]} for a in story["aliens"][:count]]
+    story["aliens"] = [{"species": str(a["species"])[:40], "look": str(a["look"])[:300], "bio": str(a.get("bio", ""))[:200]}
+                       for a in story["aliens"][:count]]
     return story
 
 
 TEMPLATE_LOOKS = {
-    "frozen": "a pale blue crystalline body, frost-white eyes and stubby icicle legs",
-    "icy": "a round white furry body, big dark eyes and short clawed limbs",
-    "temperate": "a yellow rounded body, three curious eyes and four short legs",
-    "hot": "an orange armoured shell, glowing amber eyes and six short legs",
-    "scorching": "a red spiky body, smouldering yellow eyes and crab-like claws",
-    "molten": "a glowing lava-orange body, white-hot eyes and stubby rock limbs",
+    "frozen": "a diamond-shaped head with two eyes, two short antennae and four stubby legs",
+    "icy": "a round dome head with one big eye and three dangling tentacles",
+    "temperate": "a wide oval body with three eyes and two curled antennae",
+    "hot": "a squat shell with two horns, two eyes and six short legs",
+    "scorching": "a spiky crown, two narrow eyes and two big pincer claws",
+    "molten": "a broad blocky head with a jagged crest, two eyes and thick stubby arms",
 }
 
 
 def template_story(place: sky.Place, now: sky.Sky, waves: list[Wave]) -> dict:
     return {
         "skyline": f"the skyline of {place.name}, {place.country}",
-        "aliens": [{"species": f"{w.climate.title()} Drifter", "look": TEMPLATE_LOOKS[w.climate]} for w in waves],
+        "aliens": [{"species": f"{w.climate.title()} Drifter", "look": TEMPLATE_LOOKS[w.climate],
+                    "bio": f"Crossed {w.planet.light_years:,} light-years from {w.planet.name} and is not impressed by "
+                           f"{place.name}'s {now.condition} weather."} for w in waves],
     }
 
 
@@ -208,8 +216,8 @@ def build_pack(place, now, waves: list[Wave], story: dict, images: dict, progres
                 "condition": now.condition, "temp_c": now.temp_c, "is_day": now.is_day},
         "skyline": "skyline.png" if "skyline.png" in images else None,
         "waves": [{
-            "number": w.number, "boss": w.is_boss, "species": a["species"], "look": a["look"],
-            "climate": w.climate, "hits": w.hits, "speed": w.speed,
+            "number": w.number, "boss": w.is_boss, "species": a["species"], "look": a["look"], "bio": a["bio"],
+            "climate": w.climate, "colour": w.colour, "hits": w.hits, "speed": w.speed,
             "sprite": f"alien-{w.number}.png" if f"alien-{w.number}.png" in images else None,
             "planet": {"name": w.planet.name, "star": w.planet.star, "temp_k": w.planet.temp_k,
                        "radius_earths": w.planet.radius_earths, "year_days": w.planet.year_days,

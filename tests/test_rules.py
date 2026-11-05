@@ -1,7 +1,7 @@
 import pytest
 
 from app.planets import Planet
-from app.rules import NoPlanetsOverhead, backdrop_for, climate, hits_for, pick_waves, speed_for, time_of_day
+from app.rules import NoPlanetsOverhead, climate, hits_for, pick_waves, speed_for, sprite_colour, time_of_day
 
 
 def planet(name, temp_k, radius=1.0, year=None):
@@ -44,10 +44,10 @@ def test_short_years_mean_fast_aliens():
     assert speed_for(None) == 1.0
 
 
-def test_backdrop_contrasts_with_the_alien():
-    # warm aliens are reds and oranges, so they get green; cold aliens get magenta
-    assert backdrop_for("molten") == "bright green"
-    assert backdrop_for("frozen") == "bright magenta"
+def test_sprite_colour_follows_the_climate():
+    assert sprite_colour("frozen") == "#6FD6FF"  # cold worlds are blue
+    assert sprite_colour("molten") == "#FF3B3B"  # the hottest are red
+    assert all(pick.colour for pick in pick_waves([planet("a", 60), planet("b", 500), planet("c", 3000)]))
 
 
 @pytest.mark.parametrize("local_time, is_day, phrase", [

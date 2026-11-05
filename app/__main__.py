@@ -5,6 +5,7 @@
 """
 import asyncio
 import sys
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,8 +34,9 @@ async def preview(city: str) -> None:
 
 async def make_pack(city: str, folder: Path) -> None:
     progress = Progress()
+    settings = replace(Settings.from_env(), art_deadline_s=120)  # nobody is waiting: give FLUX's queue more time
     async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}, timeout=30) as http:
-        game = await run_invasion(http, Settings.from_env(), city, progress)
+        game = await run_invasion(http, settings, city, progress)
     save(game, folder)
     for s in progress.steps:
         print(f"  {s.label:28} {s.status:9} {s.seconds:5.1f} s  ${s.cost_usd:.4f}  {s.detail}")

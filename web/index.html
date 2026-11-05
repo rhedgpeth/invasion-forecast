@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invasion Forecast</title>
+  <meta name="description" content="A retro arcade shooter: aliens invade your city from real planets whose stars are overhead right now.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="frame">
+
+  <!-- 1. Title: pick a city -->
+  <section id="title" class="screen">
+    <h1 class="logo">INVASION<br>FORECAST</h1>
+    <p class="tagline">Real weather. Real planets. Your city.</p>
+    <form id="city-form" class="city-form" novalidate>
+      <label for="city">WHICH CITY ARE YOU DEFENDING?</label>
+      <div class="row">
+        <input id="city" name="city" autocomplete="off" maxlength="80" placeholder="e.g. Nixa, Tokyo, Reykjavik" required>
+        <button type="submit">INSERT COIN</button>
+      </div>
+      <p id="city-error" class="field-error" role="alert"></p>
+    </form>
+    <ol class="how">
+      <li><b>1 SKY</b> Open-Meteo</li>
+      <li><b>2 INVADERS</b> NASA Exoplanet Archive</li>
+      <li><b class="gold">3 ART</b> Runpod GPU: LLM + image model</li>
+    </ol>
+    <div id="saved" class="saved" hidden>
+      <span>No time to wait? Play a saved invasion:</span>
+      <div id="saved-list" class="saved-list"></div>
+    </div>
+  </section>
+
+  <!-- 2. Incoming: the backend's steps, live -->
+  <section id="incoming" class="screen" hidden>
+    <h1 class="heading">INVASION INCOMING…</h1>
+    <ol id="steps" class="steps" aria-live="polite"></ol>
+    <p class="note">Every alien and the skyline are being painted for this game on a Runpod GPU.</p>
+  </section>
+
+  <!-- 3. Bio card: who's attacking, and why they look and play the way they do -->
+  <section id="card" class="screen" hidden>
+    <div class="card">
+      <div class="card-top">
+        <span id="card-wave" class="card-wave">WAVE 1 OF 3</span>
+        <span id="card-city" class="muted"></span>
+      </div>
+      <div class="card-body">
+        <figure class="portrait">
+          <canvas id="card-sprite" width="16" height="16" aria-label="The alien"></canvas>
+          <figcaption id="card-sprite-note" class="muted small"></figcaption>
+        </figure>
+        <div class="card-info">
+          <h1 id="card-name" class="card-name"></h1>
+          <p id="card-origin" class="card-origin"></p>
+          <dl class="stats">
+            <dt>TOUGHNESS</dt><dd><span id="bar-tough" class="bar"></span><span id="txt-tough"></span></dd>
+            <dt>SPEED</dt><dd><span id="bar-speed" class="bar"></span><span id="txt-speed"></span></dd>
+            <dt>HEAT</dt><dd><span id="bar-heat" class="bar"></span><span id="txt-heat"></span></dd>
+          </dl>
+          <p class="label">WHY IT LOOKS LIKE THIS</p>
+          <p id="card-look" class="card-text"></p>
+          <p class="label">BIO</p>
+          <p id="card-bio" class="card-text"></p>
+        </div>
+      </div>
+      <button id="card-go" type="button" class="wide">DEFEND</button>
+    </div>
+  </section>
+
+  <!-- 4. The game -->
+  <section id="play" class="screen" hidden>
+    <div class="hud">
+      <span>SCORE <b id="hud-score" class="gold">000000</b></span>
+      <span id="hud-wave" class="cyan"></span>
+      <span id="hud-sky" class="muted"></span>
+      <span>LIVES <b id="hud-lives" class="gold"></b></span>
+    </div>
+    <canvas id="game" width="320" height="200" tabindex="0" aria-label="Game screen. Arrow keys move, Space fires, P pauses."></canvas>
+    <div class="legend">
+      <span id="legend-alien"></span>
+      <span class="muted">← → move · SPACE fire · P pause</span>
+    </div>
+  </section>
+
+  <!-- 5. Game over: what happened, and what it took -->
+  <section id="over" class="screen" hidden>
+    <div class="over">
+      <div class="over-main">
+        <h1 id="over-title" class="heading big"></h1>
+        <p id="over-score" class="over-score"></p>
+        <p id="over-line"></p>
+        <p class="label">INVASION LOG</p>
+        <ol id="over-log" class="log"></ol>
+        <form id="again-form" class="city-form" novalidate>
+          <label for="again-city">DEFEND ANOTHER CITY</label>
+          <div class="row">
+            <input id="again-city" autocomplete="off" maxlength="80" placeholder="Try Tokyo or Reykjavik">
+            <button type="submit">INSERT COIN</button>
+          </div>
+          <p id="again-error" class="field-error" role="alert"></p>
+        </form>
+      </div>
+      <section class="receipt" aria-label="Receipt">
+        <h2>INVASION RECEIPT</h2>
+        <p id="receipt-city" class="center"></p>
+        <hr>
+        <div id="receipt-rows" class="receipt-rows"></div>
+        <hr>
+        <div class="receipt-total"><span>TOTAL</span><span id="receipt-total"></span></div>
+        <p class="small">Two AI models on Runpod Public Endpoints. Pay per call, no GPU left running.</p>
+      </section>
+    </div>
+  </section>
+
+  <!-- 6. Errors -->
+  <section id="error" class="screen" hidden>
+    <div class="error-box">
+      <h1 id="error-title" class="heading"></h1>
+      <p id="error-message"></p>
+      <div class="row">
+        <button id="error-retry" type="button">TRY AGAIN</button>
+        <button id="error-home" type="button" class="secondary">PICK ANOTHER CITY</button>
+      </div>
+      <div id="error-saved" class="saved" hidden>
+        <span>Or play a saved invasion:</span>
+        <div class="saved-list"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+<script type="module" src="screens.js"></script>
+</body>
+</html>

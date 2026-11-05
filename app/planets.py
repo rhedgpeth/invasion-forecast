@@ -93,7 +93,7 @@ def _to_planet(row: dict, lat: float, lst: float) -> Planet:
 @lru_cache(maxsize=1)
 def load_snapshot() -> list[dict]:
     data = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
-    return [dict(zip(data["columns"], values)) for values in data["rows"]]
+    return [dict(zip(data["columns"], values, strict=True)) for values in data["rows"]]
 
 
 async def refresh_snapshot() -> int:
@@ -104,7 +104,7 @@ async def refresh_snapshot() -> int:
     SNAPSHOT.write_text(json.dumps({
         "source": TAP_URL, "fetched": datetime.now(timezone.utc).date().isoformat(), "columns": COLUMNS,
         "rows": [[r[c] for c in COLUMNS] for r in rows],
-    }, separators=(",", ":")), encoding="utf-8")
+    }, separators=(",", ":")), encoding="utf-8", newline="\n")
     return len(rows)
 
 

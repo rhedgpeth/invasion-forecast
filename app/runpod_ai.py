@@ -1,6 +1,6 @@
 """Runpod Public Endpoints: an LLM writes, an image model paints. This is the file to copy into your own project.
 
-Both are ready-made models you call over HTTPS with your API key. You pay per call, and there's no GPU to rent or manage:
+Both are ready-made models you call over HTTPS with your API key. You pay per call, with no GPU to rent or manage:
 
     POST https://api.runpod.ai/v2/<endpoint>/...      Authorization: Bearer $RUNPOD_API_KEY
 

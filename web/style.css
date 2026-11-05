@@ -46,7 +46,6 @@ button:hover { filter: brightness(1.1); }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
 button:disabled { color: var(--muted); background: var(--line); cursor: default; }
 button.secondary { color: var(--text); background: var(--panel); border: 2px solid var(--line); }
-button.wide { align-self: center; padding: 0 32px; }
 .field-error { margin: 0; min-height: 1.5em; color: var(--orange); }
 
 .how { display: flex; flex-wrap: wrap; justify-content: center; margin: 16px auto 0; padding: 0; list-style: none;
@@ -58,6 +57,8 @@ button.wide { align-self: center; padding: 0 32px; }
 
 .saved { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
 .saved-list { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.credits { margin: 16px 0 0; text-align: center; font-size: 12px; color: var(--muted); }
+.credits a { color: var(--muted); }
 .saved-list button { min-height: 44px; font-size: 11px; color: var(--text); background: var(--panel); border: 2px solid var(--line); }
 
 /* Status badges (under the hood) */

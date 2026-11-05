@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "created": "2026-11-05T19:26:53+00:00",
+  "created": "2026-11-05T20:49:38+00:00",
   "city": {
     "name": "Tokyo",
     "region": "Tokyo",
@@ -9,7 +9,7 @@
     "lon": 139.69171
   },
   "sky": {
-    "local_time": "2026-11-06T04:15",
+    "local_time": "2026-11-06T05:45",
     "time_of_day": "night",
     "condition": "overcast",
     "temp_c": 14.2,
@@ -20,51 +20,53 @@
     {
       "number": 1,
       "boss": false,
-      "species": "Frozoraak",
-      "look": "Round head with two large eyes, two long antennae, and four short, stubby legs, with a wide, flat body.",
+      "species": "Froznix",
+      "look": "Round head with two large eyes, two curved antennae, and four stubby legs.",
+      "bio": "Born on a 52 K iceball 229 light-years away, Froznix thrive in the cool 14\u00b0C Tokyo night.",
       "climate": "frozen",
-      "hits": 2,
+      "colour": "#6FD6FF",
+      "hits": 4,
       "speed": 0.8,
       "sprite": "alien-1.png",
       "planet": {
-        "name": "G 192-15 c",
-        "star": "G 192-15",
-        "temp_k": 55.9,
-        "radius_earths": 3.87,
-        "year_days": 1219.0,
-        "light_years": 31,
-        "altitude_deg": 66.5
-      },
-      "bio": "Frozoraak, ice-hearted explorer from a 56 K frozen world, melts into the Tokyo night, loving the overcast chill.",
-      "colour": "#6FD6FF"
+        "name": "HD 105618 c",
+        "star": "HD 105618",
+        "temp_k": 51.64,
+        "radius_earths": 11.9,
+        "year_days": 77114.07158,
+        "light_years": 229,
+        "altitude_deg": 42.4
+      }
     },
     {
       "number": 2,
       "boss": false,
-      "species": "Scorchkin",
-      "look": "Triangular head with two glowing eyes, two short horns, and six spindly legs, with a tapering, flame-like body.",
+      "species": "Scorchling",
+      "look": "Ovoid head with one eye, two sharp horns, and six spindly legs.",
+      "bio": "From a 755 K scorched rock 513 light-years distant, Scorchling relish Tokyo's mild 14\u00b0C.",
       "climate": "hot",
-      "hits": 1,
+      "colour": "#FFA23A",
+      "hits": 2,
       "speed": 1.3,
       "sprite": "alien-2.png",
       "planet": {
-        "name": "K2-122 b",
-        "star": "K2-122",
-        "temp_k": 769.0,
-        "radius_earths": 1.16,
-        "year_days": 2.2193023,
-        "light_years": 235,
-        "altitude_deg": 72.3
-      },
-      "bio": "Scorchkin, fiery wanderer of a 769 K scorched planet, shivers in Tokyo\u2019s 14\u00b0C fog, craving a hot spring.",
-      "colour": "#FFA23A"
+        "name": "TOI-7333 b",
+        "star": "TOI-7333",
+        "temp_k": 755.0,
+        "radius_earths": 2.09469416,
+        "year_days": 6.26449803661,
+        "light_years": 513,
+        "altitude_deg": 30.7
+      }
     },
     {
       "number": 3,
       "boss": true,
-      "species": "Moltenox",
-      "look": "Ovoid head with three small eyes, two thick, molten horns, and four thick, muscular legs, with a wide, rocky body full of jagged spikes.",
+      "species": "Moltar",
+      "look": "Triangular head with three eyes, two melting spikes, and four bulky legs.",
+      "bio": "Hailing from a 2601 K molten sphere 445 light-years away, Moltar enjoy Tokyo's 14\u00b0C calm.",
       "climate": "molten",
+      "colour": "#FF3B3B",
       "hits": 20,
       "speed": 1.0,
       "sprite": "alien-3.png",
@@ -75,20 +77,18 @@
         "radius_earths": 12.1,
         "year_days": null,
         "light_years": 445,
-        "altitude_deg": 49.3
-      },
-      "bio": "Moltenox, lava-born titan from a 2601 K molten world, roars at Tokyo\u2019s drizzle, longing for a real downpour.",
-      "colour": "#FF3B3B"
+        "altitude_deg": 32.6
+      }
     }
   ],
-  "nasa_source": "live",
+  "nasa_source": "snapshot",
   "steps": [
     {
       "key": "sky",
       "label": "Read the sky",
       "status": "done",
       "detail": "Tokyo: night, overcast, 14\u00b0C",
-      "seconds": 1.4,
+      "seconds": 1.2,
       "cost_usd": 0.0,
       "requests": [
         "GET https://geocoding-api.open-meteo.com/v1/search?name=Tokyo",
@@ -98,7 +98,7 @@
         "city": "Tokyo",
         "region": "Tokyo",
         "country": "Japan",
-        "local_time": "2026-11-06T04:15",
+        "local_time": "2026-11-06T05:45",
         "time_of_day": "night",
         "condition": "overcast",
         "temp_c": 14.2
@@ -107,29 +107,29 @@
     {
       "key": "planets",
       "label": "Find the planets overhead",
-      "status": "done",
-      "detail": "654 planets overhead (live NASA data)",
-      "seconds": 1.6,
+      "status": "fallback",
+      "detail": "NASA unavailable: 812 overhead from the saved catalogue",
+      "seconds": 8.3,
       "cost_usd": 0.0,
       "requests": [
-        "GET https://exoplanetarchive.ipac.caltech.edu/TAP/sync?format=json&query=select pl_name,hostname,ra,dec,pl_rade,pl_bmasse,pl_eqt,pl_orbper,sy_dist from pscomppars where ra between 56.451 and 176.451 and dec between -24.310 and 90.000 and pl_eqt between 50 and 4500 and pl_rade is not null and sy_dist is not null"
+        "GET https://exoplanetarchive.ipac.caltech.edu/TAP/sync?format=json&query=select pl_name,hostname,ra,dec,pl_rade,pl_bmasse,pl_eqt,pl_orbper,sy_dist from pscomppars where ra between 77.199 and 197.199 and dec between -24.310 and 90.000 and pl_eqt between 50 and 4500 and pl_rade is not null and sy_dist is not null"
       ],
       "result": {
-        "overhead": 654,
-        "source": "live",
+        "overhead": 812,
+        "source": "snapshot",
         "picks": [
           {
-            "name": "G 192-15 c",
+            "name": "HD 105618 c",
             "climate": "frozen",
-            "temp_k": 55.9,
-            "light_years": 31,
+            "temp_k": 51.64,
+            "light_years": 229,
             "boss": false
           },
           {
-            "name": "K2-122 b",
+            "name": "TOI-7333 b",
             "climate": "hot",
-            "temp_k": 769.0,
-            "light_years": 235,
+            "temp_k": 755.0,
+            "light_years": 513,
             "boss": false
           },
           {
@@ -146,18 +146,18 @@
       "key": "species",
       "label": "Imagine the species",
       "status": "done",
-      "detail": "Qwen3 32B: Frozoraak, Scorchkin, Moltenox",
-      "seconds": 8.2,
-      "cost_usd": 0.0053,
+      "detail": "Qwen3 32B: Froznix, Scorchling, Moltar",
+      "seconds": 8.9,
+      "cost_usd": 0.0057,
       "requests": [
         "POST https://api.runpod.ai/v2/qwen3-32b-awq/openai/v1/chat/completions  {\"model\": \"Qwen/Qwen3-32B-AWQ\", \"messages\": [...]}"
       ],
       "result": {
         "model": "Qwen3 32B",
         "species": [
-          "Frozoraak",
-          "Scorchkin",
-          "Moltenox"
+          "Froznix",
+          "Scorchling",
+          "Moltar"
         ]
       }
     },
@@ -166,10 +166,10 @@
       "label": "Paint the art",
       "status": "done",
       "detail": "FLUX: 4 of 4 painted",
-      "seconds": 29.0,
+      "seconds": 39.5,
       "cost_usd": 0.012,
       "requests": [
-        "POST https://api.runpod.ai/v2/black-forest-labs-flux-1-schnell/runsync  \u00d74 in parallel",
+        "POST https://api.runpod.ai/v2/black-forest-labs-flux-1-schnell/runsync  \u00d74, in parallel",
         "GET https://api.runpod.ai/v2/black-forest-labs-flux-1-schnell/status/<job id>  until COMPLETED"
       ],
       "result": {
@@ -177,11 +177,11 @@
         "painted": [
           "skyline.png",
           "alien-1.png",
-          "alien-2.png",
-          "alien-3.png"
+          "alien-3.png",
+          "alien-2.png"
         ]
       }
     }
   ],
-  "cost_usd": 0.0173
+  "cost_usd": 0.0177
 }

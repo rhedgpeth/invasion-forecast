@@ -55,7 +55,8 @@ def world(when, overrides: dict | None = None) -> dict:
     lst = planets.sidereal_degrees(when, lon)
     rows = [{"pl_name": name, "hostname": name[:-2], "ra": lst, "dec": lat, "pl_rade": radius, "pl_bmasse": None,
              "pl_eqt": temp, "pl_orbper": year, "sy_dist": 100.0}
-            for name, temp, radius, year in [("Cold b", 80, 2.0, 400), ("Warm b", 500, 4.0, 20), ("Lava b", 2500, 12.0, 1.2)]]
+            for name, temp, radius, year in [("Cold b", 80, 2.0, 400), ("Warm b", 500, 4.0, 20),
+                                             ("Lava b", 2500, 12.0, 1.2)]]
     story = {"skyline": "towers and a lattice tower", "aliens": [
         {"species": "Frost Mite", "look": "a pale blue blob"}, {"species": "Dune Crab", "look": "an orange crab"},
         {"species": "Magma Lord", "look": "a glowing lava giant"}]}
@@ -66,7 +67,8 @@ def world(when, overrides: dict | None = None) -> dict:
                                              "weather_code": 73}}),
         planets.TAP_URL: (200, rows),
         f"{runpod_ai.BASE_URL}/{runpod_ai.LLM_ENDPOINT}/": (200, {
-            "choices": [{"message": {"content": "<think></think>" + json.dumps(story)}}], "usage": {"total_tokens": 800}}),
+            "choices": [{"message": {"content": "<think></think>" + json.dumps(story)}}],
+            "usage": {"total_tokens": 800}}),
         f"{runpod_ai.BASE_URL}/{runpod_ai.IMAGE_ENDPOINT}/": (200, {
             "id": "job-1", "status": "COMPLETED", "output": {"result": IMAGE_URL, "cost": 0.003}}),
         IMAGE_URL: (200, painting()),

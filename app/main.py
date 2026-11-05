@@ -149,7 +149,8 @@ async def run_job(state, job: Job, city: str, faults: frozenset) -> None:
         job.error = {"code": "city_not_found",
                      "message": f"We couldn't find a city called “{city}”. Check the spelling or try a nearby town."}
     except NoPlanetsOverhead:
-        job.error = {"code": "no_planets", "message": "No known planets are overhead there right now. Try another city."}
+        job.error = {"code": "no_planets",
+                     "message": "No known planets are overhead there right now. Try another city."}
     except UpstreamError as e:
         log.warning("invasion %s failed: %s", job.id, e)
         job.error = ({"code": "weather_down", "message": "Open-Meteo isn't answering, so we can't locate your city. "

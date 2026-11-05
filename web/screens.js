@@ -356,9 +356,7 @@ async function listSaved() {
 }
 
 listSaved();
-// Deep links to saved invasions: /?pack=tokyo-night plays one, /?replay=tokyo-night replays its loading map first.
-const query = new URLSearchParams(location.search);
-const safe = (name) => name && /^[a-z0-9-]+$/.test(name);
-if (safe(query.get("replay"))) replay(query.get("replay"));
-else if (safe(query.get("pack"))) loadGame(`/packs/${query.get("pack")}/pack.json`, true);
+// /?replay=tokyo-night replays a saved invasion's loading map: attract mode, and the demo backup if the GPU is slow.
+const replayName = new URLSearchParams(location.search).get("replay");
+if (replayName && /^[a-z0-9-]+$/.test(replayName)) replay(replayName);
 else $("city").focus();

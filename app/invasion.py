@@ -87,7 +87,8 @@ async def run_invasion(http: httpx.AsyncClient, settings: Settings, city: str, p
         moment = rules.time_of_day(now.local_time, now.is_day)
         step.detail = f"{place.name}: {moment}, {now.condition}, {now.temp_c:.0f}°C"
         step.result = {"city": place.name, "region": place.region, "country": place.country,
-                       "local_time": now.local_time, "time_of_day": moment, "condition": now.condition, "temp_c": now.temp_c}
+                       "local_time": now.local_time, "time_of_day": moment, "condition": now.condition,
+                       "temp_c": now.temp_c}
 
     # The skyline only needs the city and its sky, so it starts painting now, alongside steps 2 and 3.
     art = progress.step("art")
@@ -122,7 +123,8 @@ async def plan_waves(http, settings: Settings, progress: Progress, place, now, w
         if found.source == "live":
             step.detail = f"{len(found.planets)} planets overhead (live NASA data)"
         else:
-            step.status, step.detail = "fallback", f"NASA unavailable: {len(found.planets)} overhead from the saved catalogue"
+            step.status = "fallback"
+            step.detail = f"NASA unavailable: {len(found.planets)} overhead from the saved catalogue"
 
     # 3. Species. Falls back to built-in descriptions.
     with running(progress.step("species")) as step:
@@ -203,9 +205,9 @@ class Artist:
         names = ["skyline.png"] + [f"alien-{w.number}.png" for w in waves]
         results = await asyncio.gather(skyline_job, *(
             self.deliver(f"alien-{w.number}.png", self.alien(w, a["look"], deadline_at))
-            for w, a in zip(waves, story["aliens"])), return_exceptions=True)
-        images = {name: png for name, png in zip(names, results) if isinstance(png, bytes)}
-        for name, outcome in zip(names, results):
+            for w, a in zip(waves, story["aliens"], strict=True)), return_exceptions=True)
+        images = {name: png for name, png in zip(names, results, strict=True) if isinstance(png, bytes)}
+        for name, outcome in zip(names, results, strict=True):
             if isinstance(outcome, BaseException):
                 log.warning("painting %s failed: %s", name, outcome)
         step.cost_usd, step.seconds = round(self.cost, 4), round(time.perf_counter() - self.started, 1)
@@ -249,8 +251,8 @@ def parse_story(text: str, count: int) -> dict:
     story = json.loads(text[text.find("{"): text.rfind("}") + 1])
     if len(story.get("aliens", [])) < count:
         raise ValueError("the LLM's answer was missing parts")
-    story["aliens"] = [{"species": str(a["species"])[:40], "look": str(a["look"])[:300], "bio": str(a.get("bio", ""))[:200]}
-                       for a in story["aliens"][:count]]
+    story["aliens"] = [{"species": str(a["species"])[:40], "look": str(a["look"])[:300],
+                        "bio": str(a.get("bio", ""))[:200]} for a in story["aliens"][:count]]
     return story
 
 
@@ -277,7 +279,8 @@ def build_pack(place, now, waves: list[Wave], story: dict, images: dict, progres
     return {
         "version": 1,
         "created": when.isoformat(timespec="seconds"),
-        "city": {"name": place.name, "region": place.region, "country": place.country, "lat": place.lat, "lon": place.lon},
+        "city": {"name": place.name, "region": place.region, "country": place.country,
+                 "lat": place.lat, "lon": place.lon},
         "sky": {"local_time": now.local_time, "time_of_day": rules.time_of_day(now.local_time, now.is_day),
                 "condition": now.condition, "temp_c": now.temp_c, "is_day": now.is_day},
         "skyline": "skyline.png" if "skyline.png" in images else None,
@@ -288,7 +291,7 @@ def build_pack(place, now, waves: list[Wave], story: dict, images: dict, progres
             "planet": {"name": w.planet.name, "star": w.planet.star, "temp_k": w.planet.temp_k,
                        "radius_earths": w.planet.radius_earths, "year_days": w.planet.year_days,
                        "light_years": w.planet.light_years, "altitude_deg": w.planet.altitude_deg},
-        } for w, a in zip(waves, story["aliens"])],
+        } for w, a in zip(waves, story["aliens"], strict=True)],
         "nasa_source": nasa_source,
         "steps": [asdict(s) for s in progress.steps],
         "cost_usd": round(sum(s.cost_usd for s in progress.steps), 4),
@@ -299,7 +302,7 @@ def save(game: Game, folder: Path) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     for name, png in game.images.items():
         (folder / name).write_bytes(png)
-    (folder / "pack.json").write_text(json.dumps(game.pack, indent=2), encoding="utf-8")
+    (folder / "pack.json").write_text(json.dumps(game.pack, indent=2), encoding="utf-8", newline="\n")
 
 
 @contextmanager

@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Secrets: copy .env.example to .env and keep it out of git
+.env
+
+# Runtime data (generated games, planet cache)
+data/

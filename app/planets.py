@@ -16,7 +16,7 @@ from pathlib import Path
 
 import httpx
 
-from app.config import USER_AGENT, UpstreamError, get_json
+from app.config import USER_AGENT, UpstreamError, get_json, request_json
 
 TAP_URL = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
 COLUMNS = ["pl_name", "hostname", "ra", "dec", "pl_rade", "pl_bmasse", "pl_eqt", "pl_orbper", "sy_dist"]
@@ -24,6 +24,7 @@ COLUMNS = ["pl_name", "hostname", "ra", "dec", "pl_rade", "pl_bmasse", "pl_eqt",
 QUALITY = "pl_eqt between 50 and 4500 and pl_rade is not null and sy_dist is not null"
 SNAPSHOT = Path(__file__).with_name("planets_snapshot.json")
 MIN_ALTITUDE_DEG = 30
+NASA_TIMEOUT_S = 8  # live answers take 1-2 s; past this, the saved catalogue is the better experience
 LIGHT_YEARS_PER_PARSEC = 3.26156
 
 
@@ -65,10 +66,14 @@ def window_query(lat_deg: float, lst_deg: float, half_width_deg: float = 60) -> 
     return f"select {','.join(COLUMNS)} from pscomppars where {ra} and {dec} and {QUALITY}"
 
 
-async def overhead(http: httpx.AsyncClient, lat: float, lon: float, when: datetime) -> Overhead:
+async def overhead(http: httpx.AsyncClient, lat: float, lon: float, when: datetime,
+                   simulate_outage: bool = False) -> Overhead:
     lst = sidereal_degrees(when, lon)
     try:
-        rows = await get_json(http, "nasa", TAP_URL, query=window_query(lat, lst), format="json")
+        if simulate_outage:
+            raise UpstreamError("nasa", "simulated outage")
+        rows = await request_json(http, "nasa", "GET", TAP_URL, timeout=NASA_TIMEOUT_S,
+                                  params={"query": window_query(lat, lst), "format": "json"})
         source = "live"
     except UpstreamError:
         rows, source = load_snapshot(), "snapshot"

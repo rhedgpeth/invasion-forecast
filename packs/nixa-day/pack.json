@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "created": "2026-11-05T19:03:27+00:00",
+  "city": {
+    "name": "Nixa",
+    "region": "Missouri",
+    "country": "United States",
+    "lat": 37.04339,
+    "lon": -93.29435
+  },
+  "sky": {
+    "local_time": "2026-11-05T13:00",
+    "time_of_day": "afternoon",
+    "condition": "clear",
+    "temp_c": 18.4,
+    "is_day": true
+  },
+  "skyline": "skyline.png",
+  "waves": [
+    {
+      "number": 1,
+      "boss": false,
+      "species": "Frostspire",
+      "look": "This tall, slender alien has a shimmering white and light blue crystalline body, glowing amber eyes, and delicate, spindly limbs that resemble ice shards.",
+      "climate": "frozen",
+      "hits": 4,
+      "speed": 0.8,
+      "sprite": "alien-1.png",
+      "planet": {
+        "name": "HD 105618 c",
+        "star": "HD 105618",
+        "temp_k": 51.64,
+        "radius_earths": 11.9,
+        "year_days": 77114.07158,
+        "light_years": 229,
+        "altitude_deg": 34.3
+      }
+    },
+    {
+      "number": 2,
+      "boss": false,
+      "species": "Scorchveil",
+      "look": "This bulky, rounded alien has a fiery orange and red molten surface with glowing yellow veins, large black pupil-less eyes, and stubby, thick limbs.",
+      "climate": "hot",
+      "hits": 2,
+      "speed": 1.3,
+      "sprite": "alien-2.png",
+      "planet": {
+        "name": "TOI-1269 c",
+        "star": "TOI-1269",
+        "temp_k": 767.94,
+        "radius_earths": 2.22999162,
+        "year_days": 9.23786144195,
+        "light_years": 561,
+        "altitude_deg": 61.6
+      }
+    },
+    {
+      "number": 3,
+      "boss": true,
+      "species": "Blazehelm",
+      "look": "This towering, angular alien has a metallic gold and bright red armored body, glowing white eyes, and short, powerful limbs with jagged edges.",
+      "climate": "molten",
+      "hits": 20,
+      "speed": 1.6,
+      "sprite": "alien-3.png",
+      "planet": {
+        "name": "KELT-9 b",
+        "star": "KELT-9",
+        "temp_k": 3921.0,
+        "radius_earths": 21.70058664,
+        "year_days": 1.4811235,
+        "light_years": 667,
+        "altitude_deg": 36.4
+      }
+    }
+  ],
+  "nasa_source": "snapshot",
+  "steps": [
+    {
+      "key": "sky",
+      "label": "Read the sky",
+      "status": "done",
+      "detail": "Nixa: afternoon, clear, 18\u00b0C",
+      "seconds": 1.4,
+      "cost_usd": 0.0
+    },
+    {
+      "key": "planets",
+      "label": "Find the planets overhead",
+      "status": "fallback",
+      "detail": "NASA unavailable: 3504 overhead from the saved catalogue",
+      "seconds": 8.2,
+      "cost_usd": 0.0
+    },
+    {
+      "key": "species",
+      "label": "Imagine the species",
+      "status": "done",
+      "detail": "Qwen3 32B: Frostspire, Scorchveil, Blazehelm",
+      "seconds": 7.3,
+      "cost_usd": 0.005
+    },
+    {
+      "key": "art",
+      "label": "Paint the art",
+      "status": "done",
+      "detail": "FLUX: 4 of 4 painted",
+      "seconds": 37.7,
+      "cost_usd": 0.012
+    }
+  ],
+  "cost_usd": 0.017
+}

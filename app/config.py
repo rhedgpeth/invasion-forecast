@@ -43,8 +43,13 @@ class UpstreamError(Exception):
 
 async def get_json(http: httpx.AsyncClient, service: str, url: str, **params) -> object:
     """GET a JSON API and turn every way it can fail into one UpstreamError."""
+    return await request_json(http, service, "GET", url, params=params)
+
+
+async def request_json(http: httpx.AsyncClient, service: str, method: str, url: str, **kwargs) -> object:
+    """Call a JSON API and turn every way it can fail into one UpstreamError."""
     try:
-        resp = await http.get(url, params=params)
+        resp = await http.request(method, url, **kwargs)
     except httpx.TimeoutException as e:
         raise UpstreamError(service, "timed out") from e
     except httpx.HTTPError as e:

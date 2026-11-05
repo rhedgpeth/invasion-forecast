@@ -1,0 +1,187 @@
+{
+  "version": 1,
+  "created": "2026-11-05T20:31:44+00:00",
+  "city": {
+    "name": "Reykjavik",
+    "region": "Capital Region",
+    "country": "Iceland",
+    "lat": 64.13548,
+    "lon": -21.89541
+  },
+  "sky": {
+    "local_time": "2026-11-05T20:30",
+    "time_of_day": "night",
+    "condition": "overcast",
+    "temp_c": 8.4,
+    "is_day": false
+  },
+  "skyline": "skyline.png",
+  "waves": [
+    {
+      "number": 1,
+      "boss": false,
+      "species": "Frizblitz",
+      "look": "Triangular head with two large eyes, two antenna-like spikes on top, and three short, sturdy legs.",
+      "bio": "From a frozen world at 60 K, Frizblitz thrives in the overcast 8\u00b0C chill of Reykjavik.",
+      "climate": "frozen",
+      "colour": "#6FD6FF",
+      "hits": 4,
+      "speed": 0.8,
+      "sprite": "alien-1.png",
+      "planet": {
+        "name": "GJ 9773 b",
+        "star": "GJ 9773",
+        "temp_k": 59.89,
+        "radius_earths": 14.2,
+        "year_days": 2965.0,
+        "light_years": 52,
+        "altitude_deg": 34.4
+      }
+    },
+    {
+      "number": 2,
+      "boss": false,
+      "species": "Kerberon",
+      "look": "Ovoid head with four beady eyes, two curling antennae, and four clawed legs.",
+      "bio": "Hailing from the 775 K heat of Kepler-1188 b, Kerberon seeks the cool overcast of Reykjavik's 8\u00b0C night.",
+      "climate": "hot",
+      "colour": "#FFA23A",
+      "hits": 2,
+      "speed": 1.0,
+      "sprite": "alien-2.png",
+      "planet": {
+        "name": "Kepler-1188 b",
+        "star": "Kepler-1188",
+        "temp_k": 775.0,
+        "radius_earths": 2.08,
+        "year_days": 17.1369543,
+        "light_years": 5602,
+        "altitude_deg": 55.9
+      }
+    },
+    {
+      "number": 3,
+      "boss": true,
+      "species": "Moltenar",
+      "look": "Hexagonal head with six glowing eyes, jagged horns, and six spindly, fire-like legs.",
+      "bio": "From the molten hellscape of KELT-9 b at 3921 K, Moltenar seeks respite in Reykjavik\u2019s mild 8\u00b0C night.",
+      "climate": "molten",
+      "colour": "#FF3B3B",
+      "hits": 20,
+      "speed": 1.6,
+      "sprite": "alien-3.png",
+      "planet": {
+        "name": "KELT-9 b",
+        "star": "KELT-9",
+        "temp_k": 3921.0,
+        "radius_earths": 21.70058664,
+        "year_days": 1.4811235,
+        "light_years": 667,
+        "altitude_deg": 62.2
+      }
+    }
+  ],
+  "nasa_source": "live",
+  "steps": [
+    {
+      "key": "sky",
+      "label": "Read the sky",
+      "status": "done",
+      "detail": "Reykjavik: night, overcast, 8\u00b0C",
+      "seconds": 1.3,
+      "cost_usd": 0.0,
+      "requests": [
+        "GET https://geocoding-api.open-meteo.com/v1/search?name=Reykjavik",
+        "GET https://api.open-meteo.com/v1/forecast?latitude=64.14&longitude=-21.90&current=temperature_2m,weather_code,is_day"
+      ],
+      "result": {
+        "city": "Reykjavik",
+        "region": "Capital Region",
+        "country": "Iceland",
+        "local_time": "2026-11-05T20:30",
+        "time_of_day": "night",
+        "condition": "overcast",
+        "temp_c": 8.4
+      }
+    },
+    {
+      "key": "planets",
+      "label": "Find the planets overhead",
+      "status": "done",
+      "detail": "3156 planets overhead (live NASA data)",
+      "seconds": 1.4,
+      "cost_usd": 0.0,
+      "requests": [
+        "GET https://exoplanetarchive.ipac.caltech.edu/TAP/sync?format=json&query=select pl_name,hostname,ra,dec,pl_rade,pl_bmasse,pl_eqt,pl_orbper,sy_dist from pscomppars where (ra >= 271.124 or ra <= 31.124) and dec between 4.135 and 90.000 and pl_eqt between 50 and 4500 and pl_rade is not null and sy_dist is not null"
+      ],
+      "result": {
+        "overhead": 3156,
+        "source": "live",
+        "picks": [
+          {
+            "name": "GJ 9773 b",
+            "climate": "frozen",
+            "temp_k": 59.89,
+            "light_years": 52,
+            "boss": false
+          },
+          {
+            "name": "Kepler-1188 b",
+            "climate": "hot",
+            "temp_k": 775.0,
+            "light_years": 5602,
+            "boss": false
+          },
+          {
+            "name": "KELT-9 b",
+            "climate": "molten",
+            "temp_k": 3921.0,
+            "light_years": 667,
+            "boss": true
+          }
+        ]
+      }
+    },
+    {
+      "key": "species",
+      "label": "Imagine the species",
+      "status": "done",
+      "detail": "Qwen3 32B: Frizblitz, Kerberon, Moltenar",
+      "seconds": 10.6,
+      "cost_usd": 0.0062,
+      "requests": [
+        "POST https://api.runpod.ai/v2/qwen3-32b-awq/openai/v1/chat/completions  {\"model\": \"Qwen/Qwen3-32B-AWQ\", \"messages\": [...]}"
+      ],
+      "result": {
+        "model": "Qwen3 32B",
+        "species": [
+          "Frizblitz",
+          "Kerberon",
+          "Moltenar"
+        ]
+      }
+    },
+    {
+      "key": "art",
+      "label": "Paint the art",
+      "status": "done",
+      "detail": "FLUX: 4 of 4 painted",
+      "seconds": 48.8,
+      "cost_usd": 0.012,
+      "requests": [
+        "POST https://api.runpod.ai/v2/black-forest-labs-flux-1-schnell/runsync  \u00d74, in parallel",
+        "GET https://api.runpod.ai/v2/black-forest-labs-flux-1-schnell/status/<job id>  until COMPLETED"
+      ],
+      "result": {
+        "total": 4,
+        "painted": [
+          "alien-3.png",
+          "alien-1.png",
+          "alien-2.png",
+          "skyline.png"
+        ]
+      }
+    }
+  ],
+  "cost_usd": 0.0182
+}

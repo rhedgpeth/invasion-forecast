@@ -2,13 +2,14 @@
 
     1. Sky      Open-Meteo     Where is the city, and what's its sky doing right now?
     2. Planets  NASA           Which planets orbit stars overhead it right now?
-    3. Species  Runpod LLM     Invent an alien species for each planet, and describe the skyline.
-    4. Art      Runpod FLUX    Paint the skyline and every alien, in parallel.
+    3. Species  Runpod LLM     Invent an alien species for each planet.
+    4. Art      Runpod FLUX    Paint the skyline (starts right after step 1) and every alien, in parallel.
 
 Every step reports its progress (the loading screen shows it live) and has a planned fallback.
 """
 import asyncio
 import json
+import logging
 import random
 import time
 from collections.abc import Callable
@@ -24,9 +25,9 @@ from app.config import Settings, UpstreamError
 from app.rules import Wave
 
 SKYLINE_PROMPT = (
-    "16-bit pixel art video game backdrop. Side-on silhouette skyline of {city}, seen from far away: {skyline} "
-    "It is {time_of_day}, {condition}. The skyline sits only along the bottom quarter; the top three quarters are "
-    "open sky. Retro arcade style, limited palette, crisp pixels. No text, no signs, no lettering anywhere."
+    "16-bit pixel art video game backdrop. Side-on silhouette skyline of {city}, {where}, seen from far away: {scale}. "
+    "It is {time_of_day}, {condition}, and the sky shows it. The skyline sits only along the bottom quarter; the top "
+    "three quarters are open sky. Retro arcade style, limited palette, crisp pixels. No text, no signs, no lettering."
 )
 ALIEN_PROMPT = (
     "A simple 8-bit arcade game alien icon, drawn as one solid black silhouette on a plain white background: "
@@ -35,6 +36,7 @@ ALIEN_PROMPT = (
     "No ground, no floor line, no shadow, no colour, no text."
 )
 NEGATIVE_PROMPT = "text, letters, words, signs, logo, watermark, user interface, people, border, frame, ground, shadow"
+log = logging.getLogger("invasion")
 
 
 @dataclass
@@ -87,6 +89,27 @@ async def run_invasion(http: httpx.AsyncClient, settings: Settings, city: str, p
         step.result = {"city": place.name, "region": place.region, "country": place.country,
                        "local_time": now.local_time, "time_of_day": moment, "condition": now.condition, "temp_c": now.temp_c}
 
+    # The skyline only needs the city and its sky, so it starts painting now, alongside steps 2 and 3.
+    art = progress.step("art")
+    art.requests = [f"POST {runpod_ai.BASE_URL}/{runpod_ai.IMAGE_ENDPOINT}/runsync  ×{rules.WAVES + 1}, in parallel",
+                    f"GET {runpod_ai.BASE_URL}/{runpod_ai.IMAGE_ENDPOINT}/status/<job id>  until COMPLETED"]
+    art.result = {"total": rules.WAVES + 1, "painted": []}
+    art.status, art.detail = "running", "FLUX: painting the skyline"
+    artist = Artist(http, settings, art, on_image, gpu_down="gpu_down" in faults)
+    skyline_job = asyncio.create_task(artist.deliver("skyline.png", artist.skyline(place, now)))
+    await asyncio.sleep(0)  # let the skyline request go out before we carry on
+    try:
+        waves, story, source = await plan_waves(http, settings, progress, place, now, when, faults)
+        images = await artist.finish(skyline_job, waves, story)
+    except BaseException:
+        skyline_job.cancel()
+        art.status, art.detail = "failed", ""
+        raise
+    return Game(build_pack(place, now, waves, story, images, progress, source, when), images)
+
+
+async def plan_waves(http, settings: Settings, progress: Progress, place, now, when, faults):
+    """Steps 2 and 3: which planets are invading, and what their species are like."""
     # 2. Planets. Falls back to the bundled catalogue inside planets.overhead().
     with running(progress.step("planets")) as step:
         lst = planets.sidereal_degrees(when, place.lon)
@@ -105,83 +128,100 @@ async def run_invasion(http: httpx.AsyncClient, settings: Settings, city: str, p
     with running(progress.step("species")) as step:
         step.requests = [f"POST {runpod_ai.BASE_URL}/{runpod_ai.LLM_ENDPOINT}/openai/v1/chat/completions"
                          f'  {{"model": "{runpod_ai.LLM_MODEL}", "messages": [...]}}']
-        try:
-            if "llm_down" in faults:
-                raise UpstreamError("runpod-llm", "simulated outage")
-            writing = await runpod_ai.write(http, settings.runpod_api_key, story_prompt(place, now, waves))
-            story = parse_story(writing.text, len(waves))
-            step.cost_usd = writing.cost_usd
+        story, problem, started = None, "", time.perf_counter()
+        for attempt in range(2):  # one retry, but only if the first failure came back quickly
+            try:
+                if "llm_down" in faults:
+                    raise UpstreamError("runpod-llm", "simulated outage")
+                writing = await runpod_ai.write(http, settings.runpod_api_key, story_prompt(place, now, waves))
+                step.cost_usd = round(step.cost_usd + writing.cost_usd, 4)
+                story = parse_story(writing.text, len(waves))
+                break
+            except (UpstreamError, ValueError, KeyError) as e:
+                problem = str(e) if isinstance(e, UpstreamError) else f"unusable answer ({type(e).__name__})"
+                log.warning("species attempt %d failed: %s", attempt + 1, problem)
+                if "llm_down" in faults or time.perf_counter() - started > 20:
+                    break
+        if story:
             step.detail = "Qwen3 32B: " + ", ".join(a["species"] for a in story["aliens"])
-            step.result = {"model": "Qwen3 32B", "species": [a["species"] for a in story["aliens"]],
-                           "tokens": writing.tokens}
-        except (UpstreamError, ValueError, KeyError):
+            step.result = {"model": "Qwen3 32B", "species": [a["species"] for a in story["aliens"]]}
+        else:
             story = template_story(place, now, waves)
-            step.status, step.detail = "fallback", "LLM unavailable: used built-in descriptions"
+            step.status, step.detail = "fallback", f"LLM unavailable ({problem}): used built-in descriptions"
             step.result = {"model": "built-in", "species": [a["species"] for a in story["aliens"]]}
-
-    # 4. Art. Anything that isn't painted in time is drawn as a silhouette instead.
-    with running(progress.step("art")) as step:
-        total = len(waves) + 1
-        step.requests = [f"POST {runpod_ai.BASE_URL}/{runpod_ai.IMAGE_ENDPOINT}/runsync  ×{total} in parallel",
-                         f"GET {runpod_ai.BASE_URL}/{runpod_ai.IMAGE_ENDPOINT}/status/<job id>  until COMPLETED"]
-        step.result = {"total": total, "painted": []}
-        images, cost = await paint_all(http, settings, place, now, waves, story, step,
-                                       gpu_down="gpu_down" in faults, on_image=on_image)
-        step.cost_usd = cost
-        missing = total - len(images)
-        if missing:
-            step.status = "fallback"
-            step.detail = f"FLUX: {len(images)} of {total} painted, {missing} shown as silhouettes"
-
-    return Game(build_pack(place, now, waves, story, images, progress, found.source, when), images)
+    return waves, story, found.source
 
 
-async def paint_all(http, settings, place, now, waves: list[Wave], story: dict, step: Step, gpu_down: bool = False,
-                    on_image: Callable[[str, bytes], None] | None = None) -> tuple[dict[str, bytes], float]:
-    """Paint the skyline and every alien at the same time, all under one deadline."""
-    if gpu_down:
-        return {}, 0.0
-    deadline = time.perf_counter() + settings.art_deadline_s
-    key, total = settings.runpod_api_key, len(waves) + 1
-    cost = 0.0
+class Artist:
+    """Step 4: paints on Runpod FLUX and hands each image to the loading screen the moment it's ready.
 
-    def time_left() -> float:
-        return max(1.0, deadline - time.perf_counter())
+    The skyline starts as soon as the city is known; the aliens start once the LLM has described them.
+    Anything not painted in time becomes a silhouette, and the game still plays.
+    """
 
-    async def skyline() -> bytes:
-        nonlocal cost
-        prompt = SKYLINE_PROMPT.format(city=place.name, skyline=story["skyline"], condition=now.condition,
+    def __init__(self, http, settings: Settings, step: Step, on_image, gpu_down: bool):
+        self.http, self.settings, self.step, self.on_image, self.gpu_down = http, settings, step, on_image, gpu_down
+        self.started, self.cost = time.perf_counter(), 0.0
+
+    async def paint(self, prompt: str, deadline_at: float) -> bytes:
+        if self.gpu_down:
+            raise UpstreamError("runpod-image", "simulated outage")
+        art = await runpod_ai.paint(self.http, self.settings.runpod_api_key, prompt, NEGATIVE_PROMPT,
+                                    random.randrange(2**31), max(1.0, deadline_at - time.perf_counter()))
+        self.cost += art.cost_usd  # paid for even if we can't use it
+        return art.png
+
+    async def skyline(self, place: sky.Place, now: sky.Sky) -> bytes:
+        prompt = SKYLINE_PROMPT.format(city=place.name, where=", ".join(p for p in (place.region, place.country) if p),
+                                       scale=city_scale(place.population), condition=now.condition,
                                        time_of_day=rules.time_of_day(now.local_time, now.is_day))
-        art = await runpod_ai.paint(http, key, prompt, NEGATIVE_PROMPT, random.randrange(2**31), time_left())
-        cost += art.cost_usd
-        return sprites.background(art.png)
+        # It starts early, so it gets the alien deadline plus the time steps 2 and 3 take.
+        return sprites.background(await self.paint(prompt, self.started + self.settings.art_deadline_s + 20))
 
-    async def alien(wave: Wave, look: str) -> bytes:
-        nonlocal cost
+    async def alien(self, wave: Wave, look: str, deadline_at: float) -> bytes:
         prompt = ALIEN_PROMPT.format(look=look)
         for _ in range(2):  # one repaint if the first attempt can't be cut out cleanly
-            art = await runpod_ai.paint(http, key, prompt, NEGATIVE_PROMPT, random.randrange(2**31), time_left())
-            cost += art.cost_usd  # a rejected painting still costs money
             try:
-                return sprites.cut_out(art.png, wave.colour)
+                return sprites.cut_out(await self.paint(prompt, deadline_at), wave.colour)
             except sprites.BadSprite:
                 continue
         raise sprites.BadSprite("rejected twice")
 
-    async def deliver(name: str, painting) -> bytes:
+    async def deliver(self, name: str, painting) -> bytes:
         png = await painting
-        if on_image:
-            on_image(name, png)  # saved first, so the browser can fetch it as soon as it's listed
-        step.result["painted"].append(name)
-        step.cost_usd = round(cost, 4)
-        step.detail = f"FLUX: {len(step.result['painted'])} of {total} painted"
+        if self.on_image:
+            self.on_image(name, png)  # saved first, so the browser can fetch it as soon as it's listed
+        self.step.result["painted"].append(name)
+        self.step.cost_usd = round(self.cost, 4)
+        self.step.detail = f"FLUX: {len(self.step.result['painted'])} of {self.step.result['total']} painted"
         return png
 
-    step.detail = f"FLUX: 0 of {total} painted"
-    jobs = {"skyline.png": skyline()} | {
-        f"alien-{w.number}.png": alien(w, a["look"]) for w, a in zip(waves, story["aliens"])}
-    results = await asyncio.gather(*(deliver(n, p) for n, p in jobs.items()), return_exceptions=True)
-    return {name: png for name, png in zip(jobs, results) if isinstance(png, bytes)}, round(cost, 4)
+    async def finish(self, skyline_job: asyncio.Task, waves: list[Wave], story: dict) -> dict[str, bytes]:
+        step, total = self.step, len(waves) + 1
+        step.result["total"] = total
+        deadline_at = time.perf_counter() + self.settings.art_deadline_s
+        names = ["skyline.png"] + [f"alien-{w.number}.png" for w in waves]
+        results = await asyncio.gather(skyline_job, *(
+            self.deliver(f"alien-{w.number}.png", self.alien(w, a["look"], deadline_at))
+            for w, a in zip(waves, story["aliens"])), return_exceptions=True)
+        images = {name: png for name, png in zip(names, results) if isinstance(png, bytes)}
+        for name, outcome in zip(names, results):
+            if isinstance(outcome, BaseException):
+                log.warning("painting %s failed: %s", name, outcome)
+        step.cost_usd, step.seconds = round(self.cost, 4), round(time.perf_counter() - self.started, 1)
+        missing = total - len(images)
+        step.status = "fallback" if missing else "done"
+        step.detail = (f"FLUX: {len(images)} of {total} painted, {missing} shown as silhouettes" if missing
+                       else f"FLUX: {total} of {total} painted")
+        return images
+
+
+def city_scale(population: int | None) -> str:
+    if population and population >= 1_000_000:
+        return "a major city, with its best-known towers and landmarks"
+    if population and population >= 100_000:
+        return "a mid-sized city, with its best-known buildings and landmarks"
+    return "a small town: low rooftops, trees, church spires and perhaps a water tower, no skyscrapers"
 
 
 def story_prompt(place: sky.Place, now: sky.Sky, waves: list[Wave]) -> str:
@@ -193,10 +233,8 @@ def story_prompt(place: sky.Place, now: sky.Sky, waves: list[Wave]) -> str:
         f"City: {place.name}, {place.region}, {place.country}. Right now it is "
         f"{rules.time_of_day(now.local_time, now.is_day)} there, {now.condition}, {now.temp_c:.0f}°C.\n"
         f"The invaders come from these real planets, in order:\n{worlds}\n"
-        'Reply with ONLY this JSON: {"skyline": "...", "aliens": [{"species": "...", "look": "...", "bio": "..."}]}, '
+        'Reply with ONLY this JSON: {"aliens": [{"species": "...", "look": "...", "bio": "..."}]}, '
         "one alien per planet, in the same order.\n"
-        "skyline: one sentence describing the shapes of this city's skyline seen side-on from far away, at this time "
-        "of day and in this weather. Buildings and landmarks only; no signs, no lettering.\n"
         "species: an invented name, different for every alien.\n"
         "bio: one playful sentence for the alien's character card, under 25 words, built on its real planet facts "
         "(temperature, size, distance) with a nod to the city's weather right now. Mention only the weather given "
@@ -209,7 +247,7 @@ def story_prompt(place: sky.Place, now: sky.Sky, waves: list[Wave]) -> str:
 
 def parse_story(text: str, count: int) -> dict:
     story = json.loads(text[text.find("{"): text.rfind("}") + 1])
-    if not isinstance(story.get("skyline"), str) or len(story.get("aliens", [])) < count:
+    if len(story.get("aliens", [])) < count:
         raise ValueError("the LLM's answer was missing parts")
     story["aliens"] = [{"species": str(a["species"])[:40], "look": str(a["look"])[:300], "bio": str(a.get("bio", ""))[:200]}
                        for a in story["aliens"][:count]]
@@ -228,7 +266,6 @@ TEMPLATE_LOOKS = {
 
 def template_story(place: sky.Place, now: sky.Sky, waves: list[Wave]) -> dict:
     return {
-        "skyline": f"the skyline of {place.name}, {place.country}",
         "aliens": [{"species": f"{w.climate.title()} Drifter", "look": TEMPLATE_LOOKS[w.climate],
                     "bio": f"Crossed {w.planet.light_years:,} light-years from {w.planet.name} and is not impressed by "
                            f"{place.name}'s {now.condition} weather."} for w in waves],

@@ -252,8 +252,8 @@ async function playCurrentWave() {
   $("game").focus(); // keys go to the game, not the (now hidden) DEFEND button
 
   const result = await playWave({
-    canvas: $("game"), wave: w, sprite: game.sprites[wave], skyline: game.skyline,
-    score: game.score, lives: game.lives,
+    canvas: $("game"), wave: w, sprite: game.sprites[wave], skyline: game.skyline, sky: pack.sky,
+    score: game.score, lives: game.lives, quitButton: $("quit"),
     onHud: ({ score, lives }) => {
       $("hud-score").textContent = pad(score);
       $("hud-lives").textContent = "▲ ".repeat(Math.max(0, lives)).trim() || "–";
@@ -261,6 +261,11 @@ async function playCurrentWave() {
   });
   game.score = result.score;
   game.lives = result.lives;
+  if (result.quit) {
+    show("title");
+    $("city").focus();
+    return;
+  }
   if (!result.won) return showOver(false);
   game.wave += 1;
   if (game.wave < pack.waves.length) showCard(); else showOver(true);

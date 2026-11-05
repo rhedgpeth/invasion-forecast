@@ -37,6 +37,68 @@ const STAND_IN = [
 ];
 
 const FONT = "8px 'Press Start 2P', monospace";
+
+/**
+ * The city's live weather (from Open-Meteo), drawn by code over the painted skyline, so it moves and can't fail:
+ * rain, snow, fog, drifting clouds, lightning in a storm, twinkling stars on a clear night.
+ */
+export function makeWeather(sky) {
+  const condition = sky?.condition || "clear";
+  const kind = /thunder/.test(condition) ? "storm" : /snow/.test(condition) ? "snow"
+    : /rain|drizzle|shower/.test(condition) ? "rain" : /fog/.test(condition) ? "fog"
+    : /overcast|cloud/.test(condition) ? "cloud" : "clear";
+  const night = sky ? !sky.is_day : false;
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const many = (n, make) => Array.from({ length: n }, make);
+
+  const drops = kind === "rain" || kind === "storm"
+    ? many(/drizzle/.test(condition) ? 40 : kind === "storm" ? 120 : 80, () => ({ x: rand(0, W), y: rand(0, H), v: rand(150, 210) })) : [];
+  const flakes = kind === "snow" ? many(/heavy/.test(condition) ? 110 : 70, () => ({ x: rand(0, W), y: rand(0, H), v: rand(10, 26), p: rand(0, 6), s: Math.random() < 0.3 ? 2 : 1 })) : [];
+  const banks = kind === "fog" ? many(4, (_, i) => ({ x: rand(0, W), y: 50 + i * 32, h: rand(16, 28), v: rand(4, 9), a: rand(0.08, 0.14) })) : [];
+  const clouds = kind === "cloud" || kind === "storm" || kind === "rain" || kind === "snow"
+    ? many(/overcast/.test(condition) || kind !== "cloud" ? 7 : 4, () => ({ x: rand(-40, W), y: rand(4, 52), w: rand(30, 60), v: rand(3, 8) })) : [];
+  const stars = kind === "clear" && night ? many(28, () => ({ x: rand(0, W), y: rand(0, 90), p: rand(0, 6) })) : [];
+  let t = 0;
+  let flash = 0;
+  let nextFlash = rand(2, 5);
+
+  return {
+    update(dt) {
+      t += dt;
+      for (const d of drops) { d.y += d.v * dt; d.x += 25 * dt; if (d.y > H) { d.y = -6; d.x = rand(-20, W); } }
+      for (const f of flakes) { f.y += f.v * dt; if (f.y > H) { f.y = -2; f.x = rand(0, W); } }
+      for (const b of banks) { b.x = (b.x + b.v * dt) % W; }
+      for (const c of clouds) { c.x += c.v * dt; if (c.x > W) { c.x = -c.w; c.y = rand(4, 52); } }
+      if (kind === "storm") {
+        flash = Math.max(0, flash - dt);
+        nextFlash -= dt;
+        if (nextFlash <= 0) { flash = 0.12; nextFlash = Math.random() < 0.3 ? 0.18 : rand(3, 7); } // sometimes a double flash
+      }
+    },
+    draw(ctx) {
+      for (const s of stars) {
+        ctx.fillStyle = `rgba(232, 232, 240, ${0.35 + 0.35 * Math.sin(t * 2 + s.p)})`;
+        ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, 1);
+      }
+      ctx.fillStyle = night ? "rgba(58, 58, 80, 0.55)" : "rgba(200, 200, 214, 0.35)";
+      for (const c of clouds) {
+        const x = Math.round(c.x), y = Math.round(c.y), w = Math.round(c.w);
+        ctx.fillRect(x, y + 4, w, 6);
+        ctx.fillRect(x + 6, y, Math.round(w * 0.45), 6);
+        ctx.fillRect(x + Math.round(w * 0.5), y + 2, Math.round(w * 0.35), 4);
+      }
+      for (const b of banks) {
+        ctx.fillStyle = `rgba(200, 200, 214, ${b.a})`;
+        ctx.fillRect(Math.round(b.x) - W, b.y, W * 2, Math.round(b.h));
+      }
+      ctx.fillStyle = "rgba(170, 200, 255, 0.55)";
+      for (const d of drops) ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 5);
+      ctx.fillStyle = "rgba(240, 244, 255, 0.85)";
+      for (const f of flakes) ctx.fillRect(Math.round(f.x + Math.sin(t + f.p) * 6), Math.round(f.y), f.s, f.s);
+      if (flash > 0) { ctx.fillStyle = "rgba(255, 255, 255, 0.35)"; ctx.fillRect(0, 0, W, H); }
+    },
+  };
+}
 const KEYS = new Set(["ArrowLeft", "ArrowRight", "KeyA", "KeyD", "Space"]);
 
 function bitmap(rows, colour) {
@@ -58,10 +120,12 @@ export function spriteCanvas(img) {
   return c;
 }
 
-export function playWave({ canvas, wave, sprite, skyline, score, lives, onHud }) {
+/** Resolves with { won, quit, score, lives }. Q (or `quitButton`) ends the game early. */
+export function playWave({ canvas, wave, sprite, skyline, sky, score, lives, onHud, quitButton }) {
   return new Promise((resolve) => {
     const ctx = canvas.getContext("2d");
     ctx.imageSmoothingEnabled = false;
+    const weather = makeWeather(sky);
     const ship = bitmap(SHIP, "#FFD23F");
     const keys = new Set();
     const player = { x: W / 2 - 6, y: H - 12, w: 13, h: 7, cooldown: 0, safe: 1 };
@@ -89,19 +153,24 @@ export function playWave({ canvas, wave, sprite, skyline, score, lives, onHud })
     const down = (e) => {
       if (KEYS.has(e.code)) { e.preventDefault(); keys.add(e.code); }
       if (e.code === "KeyP" || e.code === "Escape") paused = !paused;
+      if (e.code === "KeyQ") finish(false, true);
     };
     const up = (e) => keys.delete(e.code);
     const hidden = () => { if (document.hidden) paused = true; };
+    const quit = () => finish(false, true);
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     document.addEventListener("visibilitychange", hidden);
+    quitButton?.addEventListener("click", quit);
 
-    function finish(won) {
+    function finish(won, quitting = false) {
+      if (finished) return;
       finished = true;
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       document.removeEventListener("visibilitychange", hidden);
-      resolve({ won, score, lives });
+      quitButton?.removeEventListener("click", quit);
+      resolve({ won, quit: quitting, score, lives });
     }
 
     function hud() { onHud({ score, lives }); }
@@ -113,6 +182,7 @@ export function playWave({ canvas, wave, sprite, skyline, score, lives, onHud })
     function pop(x, y, colour) { pops.push({ x, y, t: 0, colour }); }
 
     function update(dt) {
+      weather.update(dt);
       stateTime += dt;
       if (state === "intro") { if (stateTime > 1.2) { state = "play"; stateTime = 0; } return; }
       if (state !== "play") { if (stateTime > 1.6) finish(state === "won"); return; }
@@ -212,6 +282,7 @@ export function playWave({ canvas, wave, sprite, skyline, score, lives, onHud })
         ctx.fillStyle = "#3A3A50";
         for (let i = 0; i < 40; i++) ctx.fillRect((i * 97) % W, (i * 53) % (H - 40), 1, 1);
       }
+      weather.draw(ctx); // behind the aliens, so they stay readable
 
       const blink = (t) => t > 0 && Math.floor(t * 40) % 2 === 0;
       for (const a of aliens) if (!blink(a.flash)) ctx.drawImage(sprite, Math.round(a.x), Math.round(a.y));
@@ -239,7 +310,10 @@ export function playWave({ canvas, wave, sprite, skyline, score, lives, onHud })
       const banner = { intro: wave.boss ? "BOSS INCOMING" : `WAVE ${wave.number}`, won: wave.boss ? "BOSS DESTROYED" : "WAVE CLEARED",
                        lost: "CITY FALLEN" }[state];
       if (banner) text(banner, H / 2);
-      if (paused) text("PAUSED", H / 2);
+      if (paused) {
+        text("PAUSED", H / 2 - 10);
+        text("P RESUME  Q QUIT", H / 2 + 12);
+      }
     }
 
     function text(message, y) {

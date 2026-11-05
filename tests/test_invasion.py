@@ -49,6 +49,24 @@ async def test_progress_shares_results_and_requests_as_they_happen():
 
 
 @pytest.mark.anyio
+async def test_skyline_starts_painting_before_the_llm_is_asked():
+    order = []
+    routes = world(WHEN)
+    llm_url = f"{runpod_ai.BASE_URL}/{runpod_ai.LLM_ENDPOINT}/"
+
+    def llm(request):
+        order.append("llm")
+        return routes[llm_url]
+
+    def flux(request):
+        order.append("skyline" if b"skyline" in request.content else "alien")
+        return routes[FLUX]
+
+    await invade({llm_url: llm, FLUX: flux})
+    assert order.index("skyline") < order.index("llm") < order.index("alien")
+
+
+@pytest.mark.anyio
 async def test_weather_down_stops_the_game():
     with pytest.raises(UpstreamError) as err:
         await invade({sky.GEOCODE_URL: (503, "down")})

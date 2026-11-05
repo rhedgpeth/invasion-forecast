@@ -184,7 +184,9 @@ button.wide { align-self: center; padding: 0 32px; }
 .hud { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 20px; font: 12px/1.8 var(--pixel); }
 .hud .muted { font: 14px var(--mono); }
 #game { width: 100%; aspect-ratio: 16 / 10; image-rendering: pixelated; background: #0B0B1A; border: 2px solid var(--line); }
-.legend { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; margin-top: -12px; }
+.legend { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; margin-top: -12px; }
+.legend-keys { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.small-button { min-height: 44px; padding: 0 14px; font-size: 10px; }
 
 /* Game over */
 .over { display: flex; gap: 40px; flex-wrap: wrap; }

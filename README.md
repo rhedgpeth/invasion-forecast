@@ -9,7 +9,8 @@ last one a boss.
 It's a small, complete example of building on [Runpod](https://www.runpod.io/): a web app hosted on a Runpod Pod
 that combines two free public APIs with two AI models on Runpod Public Endpoints.
 
-**Play it:** [live on Runpod](#) · **Watch it build:** the loading screen is a live map of every request.
+**Play it:** [live on Runpod](https://jom4ayqem6e6b1-8000.proxy.runpod.net) · **Watch it build:** the loading screen
+is a live map of every request.
 
 ![The loading screen: a live map of the browser, the game backend on Runpod, two Runpod GPU models and two free APIs](docs/images/topology.png)
 
@@ -101,10 +102,14 @@ Runpod Public Endpoints, so there's no GPU to rent for the server.
    ```
 2. **Store your key as a Runpod secret.** In the console, go to **Secrets** and create one named
    `invasion_forecast_key`.
-3. **Create a CPU Pod** from the image:
+3. **Create a CPU Pod** from the image. The smallest Compute-Optimized one (2 vCPU, 4 GB) is plenty, at $0.06 an
+   hour:
    - Expose HTTP port `8000`.
    - Set the environment variable `RUNPOD_API_KEY` to `{{ RUNPOD_SECRET_invasion_forecast_key }}`.
 4. **Open** `https://<pod-id>-8000.proxy.runpod.net`.
+
+Prefer the API? The same Pod is one `POST https://rest.runpod.io/v1/pods` with `"computeType": "CPU"`,
+`"imageName"`, `"ports": ["8000/http"]` and the `env` above.
 
 Runpod's proxy closes requests after 100 s. A game takes 40–60 s to build, so the API never holds a request open
 that long: the browser starts a job, then checks its progress every 1.5 s.
@@ -117,9 +122,10 @@ that long: the browser starts a job, then checks its progress every 1.5 s.
 | [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/docs/TAP/usingTAP.html) | Free, no key | None published | 1 small query per game, an 8 s timeout, and a bundled snapshot fallback |
 | Runpod Qwen3 32B | $10 per million tokens | Pay per use | About 800 tokens a game: under 1 cent |
 | Runpod FLUX.1 Schnell | $0.003 per image (measured) | Pay per use | 4 images a game: about 1.2 cents |
+| Runpod CPU Pod (hosting) | $0.06 an hour | — | About $1.44 a day while it's running |
 
 A game costs about **2 cents** of Runpod credit. With the default cap of 200 games a day, the worst case is about $4 a
-day.
+day of games, plus hosting.
 
 ## When things go wrong
 

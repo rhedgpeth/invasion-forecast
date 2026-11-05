@@ -115,7 +115,7 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
         if not job:
             return error(404, "unknown_invasion", "That invasion has expired. Start a new one.")
         return {"id": job.id, "status": job.status, "steps": [asdict(s) for s in job.progress.steps],
-                "pack": job.pack, "error": job.error}
+                "images": f"/games/{job.id}/", "pack": job.pack, "error": job.error}
 
     @app.get("/api/packs")
     async def saved_packs():
@@ -134,9 +134,15 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
 
 
 async def run_job(state, job: Job, city: str, faults: frozenset) -> None:
+    folder = state.settings.data_dir / "games" / job.id
+
+    def on_image(name: str, png: bytes) -> None:  # each image is served as soon as it's painted
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_bytes(png)
+
     try:
-        game = await run_invasion(state.http, state.settings, city, job.progress, faults)
-        save(game, state.settings.data_dir / "games" / job.id)
+        game = await run_invasion(state.http, state.settings, city, job.progress, faults, on_image=on_image)
+        save(game, folder)
         job.pack, job.status = f"/games/{job.id}/pack.json", "ready"
         return
     except CityNotFound:

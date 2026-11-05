@@ -1,6 +1,7 @@
-// Screens: title → incoming (live backend steps) → bio card → wave → … → game over. Plus errors.
+// Screens: title → incoming (a live map of the infrastructure) → bio card → wave → … → game over. Plus errors.
 // The backend contract is two calls: POST /api/invasions starts a game, GET /api/invasions/{id} reports progress.
 import { playWave, spriteCanvas } from "./game.js";
+import { mountTopology } from "./topology.js";
 
 const $ = (id) => document.getElementById(id);
 const POLL_MS = 1500;
@@ -11,8 +12,9 @@ const STATUS = { waiting: "WAITING", running: "WORKING", done: "DONE", fallback:
 const RECEIPT = { sky: "Sky · Open-Meteo", planets: "Planets · NASA", species: "Species · Runpod Qwen3", art: "Art · Runpod FLUX" };
 const ERROR_TITLES = { city_not_found: "UNKNOWN CITY", weather_down: "CAN'T READ THE SKY", no_planets: "EMPTY SKY" };
 
-let game = null; // { pack, saved, skyline, sprites, score, lives, wave }
+let game = null; // { pack, base, saved, skyline, sprites, score, lives, wave }
 let lastCity = "";
+let live = null; // the invasion being built: { steps, images, city }, for "under the hood" while loading
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pad = (n) => String(n).padStart(6, "0");
@@ -54,9 +56,14 @@ async function start(input, errorEl) {
   if (!resp.ok) return showError("SOMETHING BROKE", body.error?.message || `The server answered ${resp.status}.`, city);
 
   lastCity = city;
-  renderSteps([]);
+  game = null;
+  $("incoming-sub").textContent = `Defending ${city}`;
+  $("meet").hidden = true;
+  $("spend").textContent = "$0.0000";
+  const render = mountTopology($("topology"), city);
+  $("incoming-title").textContent = "INVASION INCOMING…";
   show("incoming");
-  follow(body.poll, city);
+  follow(body.poll, city, render);
 }
 
 function fieldError(input, errorEl, message) {
@@ -86,7 +93,7 @@ function coolDown(form, errorEl, error, seconds) {
 
 // ---------- 2. Follow the backend, step by step ----------
 
-async function follow(url, city) {
+async function follow(url, city, render) {
   for (;;) {
     let job;
     try {
@@ -96,8 +103,12 @@ async function follow(url, city) {
       continue;
     }
     if (!job.status) return showError("INVASION LOST", job.error?.message || "That invasion expired.", city);
-    renderSteps(job.steps);
-    if (job.status === "ready") return loadGame(job.pack, false);
+    live = { steps: job.steps, images: job.images, city };
+    showProgress(render(job.steps, job.images), city, job.steps.length);
+    if (job.status === "ready") {
+      await prepareGame(job.pack, false);
+      return ready(city);
+    }
     if (job.status === "failed") {
       return showError(ERROR_TITLES[job.error.code] || "INVASION ABORTED", job.error.message, city);
     }
@@ -105,26 +116,71 @@ async function follow(url, city) {
   }
 }
 
-function renderSteps(steps) {
-  const list = $("steps");
-  list.replaceChildren(...steps.map((s) => el("li", {},
-    el("span", { className: `badge ${s.status}`, textContent: STATUS[s.status] || s.status }),
-    el("span", {}, el("span", { className: "step-name", textContent: s.label }),
-      el("span", { className: "step-detail", textContent: s.detail || " " })),
-    el("span", { className: "step-time", textContent: s.seconds == null ? "" : `${s.seconds.toFixed(1)} s` }),
-  )));
+function showProgress(view, city, total) {
+  $("spend").textContent = `$${view.spend.toFixed(4)}`;
+  $("caption-text").textContent = view.caption.text;
+  $("caption").className = `caption ${view.caption.tone}`;
+  if (view.current) $("incoming-sub").textContent = `Defending ${city} · step ${view.current} of ${total}`;
+}
+
+function ready(city) {
+  $("incoming-title").textContent = "INVASION READY";
+  $("incoming-sub").textContent = `Defending ${city} · ready`;
+  $("meet").hidden = false;
+  $("meet").focus(); // Space or Enter: a booth host can talk through the map first
+}
+
+$("meet").addEventListener("click", () => showCard());
+
+/** Replay a saved invasion's recorded steps through the map in ~15 s: attract mode, and a demo backup. */
+async function replay(name) {
+  const url = `/packs/${name}/pack.json`;
+  const pack = await (await fetch(url)).json();
+  const city = pack.city.name;
+  const base = `/packs/${name}/`;
+  const render = mountTopology($("topology"), city);
+  $("meet").hidden = true;
+  $("incoming-title").textContent = "INVASION INCOMING…";
+  $("incoming-sub").textContent = `Defending ${city} · replay of a saved invasion`;
+  show("incoming");
+  const total = pack.steps.reduce((t, s) => t + (s.seconds || 0), 0);
+  const speed = Math.max(1, total / 15);
+  let start = 0;
+  const spans = pack.steps.map((s) => { const span = [start, start + (s.seconds || 0.5) / speed]; start = span[1]; return span; });
+  const began = performance.now();
+  for (;;) {
+    const t = (performance.now() - began) / 1000;
+    const steps = pack.steps.map((s, i) => {
+      const [from, to] = spans[i];
+      if (t < from) return { ...s, status: "waiting", seconds: null, cost_usd: 0, result: {} };
+      if (t >= to) return s;
+      const share = (t - from) / (to - from);
+      const result = s.key === "art"
+        ? { ...s.result, painted: s.result.painted.slice(0, Math.floor(share * s.result.total)) } : {};
+      return { ...s, status: "running", seconds: null, cost_usd: s.key === "art" ? s.cost_usd * share : 0, result };
+    });
+    showProgress(render(steps, base), city, steps.length);
+    if (t >= start) break;
+    await sleep(250);
+  }
+  await prepareGame(url, true);
+  ready(city);
 }
 
 // ---------- Load a game pack (fresh from the backend, or a saved one) ----------
 
-async function loadGame(packUrl, saved) {
+async function prepareGame(packUrl, saved) {
   const pack = await (await fetch(packUrl)).json();
   const base = packUrl.replace(/pack\.json$/, "");
   const [skyline, ...sprites] = await Promise.all([
     loadImage(pack.skyline && base + pack.skyline),
     ...pack.waves.map((w) => loadImage(w.sprite && base + w.sprite)),
   ]);
-  game = { pack, saved, skyline, sprites: sprites.map(spriteCanvas), score: 0, lives: 3, wave: 0 };
+  game = { pack, base, saved, skyline, sprites: sprites.map(spriteCanvas), score: 0, lives: 3, wave: 0 };
+}
+
+async function loadGame(packUrl, saved) {
+  await prepareGame(packUrl, saved);
   showCard();
 }
 
@@ -254,6 +310,31 @@ $("error-retry").addEventListener("click", () => {
 });
 $("error-home").addEventListener("click", () => { show("title"); $("city").focus(); });
 
+// ---------- Under the hood: the same map, frozen, plus every request ----------
+
+function openHood() {
+  const source = game ? { steps: game.pack.steps, images: game.base, city: game.pack.city.name } : live;
+  if (!source) return;
+  mountTopology($("hood-topology"), source.city)(source.steps, source.images);
+  $("hood-steps").replaceChildren(...source.steps.map((s) => el("li", {},
+    el("div", { className: "hood-row" },
+      el("span", { className: `badge ${s.status}`, textContent: STATUS[s.status] || s.status }),
+      el("b", { textContent: s.label }),
+      el("span", { className: "muted", textContent: [s.seconds == null ? "" : `${s.seconds.toFixed(1)} s`,
+        s.cost_usd ? `$${s.cost_usd.toFixed(4)}` : "free"].filter(Boolean).join(" · ") })),
+    el("p", { className: "muted", textContent: s.detail }),
+    ...(s.requests || []).map((r) => el("code", { textContent: r })),
+  )));
+  $("hood").showModal();
+}
+
+document.addEventListener("click", (e) => { if (e.target.closest("[data-hood]")) openHood(); });
+$("hood-close").addEventListener("click", () => $("hood").close());
+document.addEventListener("keydown", (e) => {
+  if (e.code !== "KeyU" || e.target.matches("input") || !$("play").hidden) return;
+  if ($("hood").open) $("hood").close(); else openHood();
+});
+
 // ---------- Saved invasions: offline play, the demo backup ----------
 
 async function listSaved() {
@@ -270,7 +351,9 @@ async function listSaved() {
 }
 
 listSaved();
-// Deep link to a saved invasion, e.g. /?pack=tokyo-night: a one-click demo backup.
-const deepLink = new URLSearchParams(location.search).get("pack");
-if (deepLink && /^[a-z0-9-]+$/.test(deepLink)) loadGame(`/packs/${deepLink}/pack.json`, true);
+// Deep links to saved invasions: /?pack=tokyo-night plays one, /?replay=tokyo-night replays its loading map first.
+const query = new URLSearchParams(location.search);
+const safe = (name) => name && /^[a-z0-9-]+$/.test(name);
+if (safe(query.get("replay"))) replay(query.get("replay"));
+else if (safe(query.get("pack"))) loadGame(`/packs/${query.get("pack")}/pack.json`, true);
 else $("city").focus();

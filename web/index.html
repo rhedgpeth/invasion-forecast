@@ -35,11 +35,20 @@
     </div>
   </section>
 
-  <!-- 2. Incoming: the backend's steps, live -->
+  <!-- 2. Incoming: a live map of the infrastructure while the backend builds the game -->
   <section id="incoming" class="screen" hidden>
-    <h1 class="heading">INVASION INCOMING…</h1>
-    <ol id="steps" class="steps" aria-live="polite"></ol>
-    <p class="note">Every alien and the skyline are being painted for this game on a Runpod GPU.</p>
+    <div class="incoming-top">
+      <div>
+        <h1 id="incoming-title" class="heading">INVASION INCOMING…</h1>
+        <p id="incoming-sub" class="muted"></p>
+      </div>
+      <div class="spend"><span>GPU SPEND SO FAR</span><b id="spend">$0.0000</b></div>
+    </div>
+    <div id="topology" class="topology"><div class="t-stage"></div></div>
+    <div id="caption" class="caption" aria-live="polite">
+      <span id="caption-text">Contacting the game backend…</span>
+      <button id="meet" type="button" hidden>MEET THE INVADERS</button>
+    </div>
   </section>
 
   <!-- 3. Bio card: who's attacking, and why they look and play the way they do -->
@@ -68,7 +77,10 @@
           <p id="card-bio" class="card-text"></p>
         </div>
       </div>
-      <button id="card-go" type="button" class="wide">DEFEND</button>
+      <div class="row center-row">
+        <button id="card-go" type="button">DEFEND</button>
+        <button type="button" class="secondary" data-hood>UNDER THE HOOD</button>
+      </div>
     </div>
   </section>
 
@@ -113,6 +125,7 @@
         <hr>
         <div class="receipt-total"><span>TOTAL</span><span id="receipt-total"></span></div>
         <p class="small">Two AI models on Runpod Public Endpoints. Pay per call, no GPU left running.</p>
+        <button type="button" class="secondary" data-hood>UNDER THE HOOD</button>
       </section>
     </div>
   </section>
@@ -134,6 +147,17 @@
   </section>
 
 </main>
+
+<!-- Under the hood: the same map, frozen, plus every request the backend made -->
+<dialog id="hood" class="hood" aria-labelledby="hood-title">
+  <div class="hood-top">
+    <h2 id="hood-title" class="heading">UNDER THE HOOD</h2>
+    <button id="hood-close" type="button" class="secondary">CLOSE · U</button>
+  </div>
+  <div id="hood-topology" class="topology"><div class="t-stage"></div></div>
+  <ol id="hood-steps" class="hood-steps"></ol>
+  <p class="muted small">Want to build your own? The code, and a step-by-step guide to deploying it on Runpod, are in the project README.</p>
+</dialog>
 <script type="module" src="screens.js"></script>
 </body>
 </html>

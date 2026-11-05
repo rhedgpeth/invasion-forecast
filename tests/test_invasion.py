@@ -34,6 +34,21 @@ async def test_happy_path_makes_a_complete_game():
 
 
 @pytest.mark.anyio
+async def test_progress_shares_results_and_requests_as_they_happen():
+    delivered = []
+    progress = Progress()
+    async with fake_http(world(WHEN)) as http:
+        await run_invasion(http, SETTINGS, "Tokyo", progress, when=WHEN, on_image=lambda n, _: delivered.append(n))
+    steps = {s.key: s for s in progress.steps}
+    assert steps["sky"].result["condition"] == "snow" and len(steps["sky"].requests) == 2
+    assert steps["planets"].result["overhead"] == 3 and steps["planets"].result["picks"][-1]["boss"]
+    assert "from pscomppars" in steps["planets"].requests[0]
+    assert steps["species"].result["species"] == ["Frost Mite", "Dune Crab", "Magma Lord"]
+    assert sorted(steps["art"].result["painted"]) == sorted(delivered) == [
+        "alien-1.png", "alien-2.png", "alien-3.png", "skyline.png"]
+
+
+@pytest.mark.anyio
 async def test_weather_down_stops_the_game():
     with pytest.raises(UpstreamError) as err:
         await invade({sky.GEOCODE_URL: (503, "down")})

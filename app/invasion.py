@@ -11,6 +11,7 @@ import asyncio
 import json
 import random
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -44,6 +45,8 @@ class Step:
     detail: str = ""
     seconds: float | None = None
     cost_usd: float = 0.0
+    requests: list[str] = field(default_factory=list)  # the calls this step made, for "under the hood"
+    result: dict = field(default_factory=dict)  # what it found, shown on the topology as soon as it's known
 
 
 @dataclass
@@ -64,22 +67,35 @@ class Game:
 
 
 async def run_invasion(http: httpx.AsyncClient, settings: Settings, city: str, progress: Progress | None = None,
-                       faults: frozenset = frozenset(), when: datetime | None = None) -> Game:
+                       faults: frozenset = frozenset(), when: datetime | None = None,
+                       on_image: Callable[[str, bytes], None] | None = None) -> Game:
+    """`on_image(name, png)` is called the moment each image is painted, so the loading screen can show it."""
     progress = progress or Progress()
     when = when or datetime.now(timezone.utc)
 
     # 1. Sky. No fallback: without a city there's nothing to defend.
     with running(progress.step("sky")) as step:
+        step.requests = [f"GET {sky.GEOCODE_URL}?name={city}"]
         if "weather_down" in faults:
             raise UpstreamError("open-meteo", "simulated outage")
         place = await sky.find_city(http, city)
+        step.requests.append(f"GET {sky.FORECAST_URL}?latitude={place.lat:.2f}&longitude={place.lon:.2f}"
+                             "&current=temperature_2m,weather_code,is_day")
         now = await sky.read_sky(http, place)
-        step.detail = f"{place.name}: {rules.time_of_day(now.local_time, now.is_day)}, {now.condition}, {now.temp_c:.0f}°C"
+        moment = rules.time_of_day(now.local_time, now.is_day)
+        step.detail = f"{place.name}: {moment}, {now.condition}, {now.temp_c:.0f}°C"
+        step.result = {"city": place.name, "region": place.region, "country": place.country,
+                       "local_time": now.local_time, "time_of_day": moment, "condition": now.condition, "temp_c": now.temp_c}
 
     # 2. Planets. Falls back to the bundled catalogue inside planets.overhead().
     with running(progress.step("planets")) as step:
+        lst = planets.sidereal_degrees(when, place.lon)
+        step.requests = [f"GET {planets.TAP_URL}?format=json&query={planets.window_query(place.lat, lst)}"]
         found = await planets.overhead(http, place.lat, place.lon, when, simulate_outage="nasa_down" in faults)
         waves = rules.pick_waves(found.planets)
+        step.result = {"overhead": len(found.planets), "source": found.source, "picks": [
+            {"name": w.planet.name, "climate": w.climate, "temp_k": w.planet.temp_k,
+             "light_years": w.planet.light_years, "boss": w.is_boss} for w in waves]}
         if found.source == "live":
             step.detail = f"{len(found.planets)} planets overhead (live NASA data)"
         else:
@@ -87,6 +103,8 @@ async def run_invasion(http: httpx.AsyncClient, settings: Settings, city: str, p
 
     # 3. Species. Falls back to built-in descriptions.
     with running(progress.step("species")) as step:
+        step.requests = [f"POST {runpod_ai.BASE_URL}/{runpod_ai.LLM_ENDPOINT}/openai/v1/chat/completions"
+                         f'  {{"model": "{runpod_ai.LLM_MODEL}", "messages": [...]}}']
         try:
             if "llm_down" in faults:
                 raise UpstreamError("runpod-llm", "simulated outage")
@@ -94,44 +112,48 @@ async def run_invasion(http: httpx.AsyncClient, settings: Settings, city: str, p
             story = parse_story(writing.text, len(waves))
             step.cost_usd = writing.cost_usd
             step.detail = "Qwen3 32B: " + ", ".join(a["species"] for a in story["aliens"])
+            step.result = {"model": "Qwen3 32B", "species": [a["species"] for a in story["aliens"]],
+                           "tokens": writing.tokens}
         except (UpstreamError, ValueError, KeyError):
             story = template_story(place, now, waves)
             step.status, step.detail = "fallback", "LLM unavailable: used built-in descriptions"
+            step.result = {"model": "built-in", "species": [a["species"] for a in story["aliens"]]}
 
     # 4. Art. Anything that isn't painted in time is drawn as a silhouette instead.
     with running(progress.step("art")) as step:
-        images, cost = await paint_all(http, settings, place, now, waves, story, step, gpu_down="gpu_down" in faults)
+        total = len(waves) + 1
+        step.requests = [f"POST {runpod_ai.BASE_URL}/{runpod_ai.IMAGE_ENDPOINT}/runsync  ×{total} in parallel",
+                         f"GET {runpod_ai.BASE_URL}/{runpod_ai.IMAGE_ENDPOINT}/status/<job id>  until COMPLETED"]
+        step.result = {"total": total, "painted": []}
+        images, cost = await paint_all(http, settings, place, now, waves, story, step,
+                                       gpu_down="gpu_down" in faults, on_image=on_image)
         step.cost_usd = cost
-        missing = len(waves) + 1 - len(images)
+        missing = total - len(images)
         if missing:
             step.status = "fallback"
-            step.detail = f"FLUX: {len(images)} of {len(waves) + 1} painted, {missing} shown as silhouettes"
+            step.detail = f"FLUX: {len(images)} of {total} painted, {missing} shown as silhouettes"
 
     return Game(build_pack(place, now, waves, story, images, progress, found.source, when), images)
 
 
-async def paint_all(http, settings, place, now, waves: list[Wave], story: dict, step: Step,
-                    gpu_down: bool = False) -> tuple[dict[str, bytes], float]:
+async def paint_all(http, settings, place, now, waves: list[Wave], story: dict, step: Step, gpu_down: bool = False,
+                    on_image: Callable[[str, bytes], None] | None = None) -> tuple[dict[str, bytes], float]:
     """Paint the skyline and every alien at the same time, all under one deadline."""
     if gpu_down:
         return {}, 0.0
     deadline = time.perf_counter() + settings.art_deadline_s
     key, total = settings.runpod_api_key, len(waves) + 1
-    painted, cost = 0, 0.0
+    cost = 0.0
 
     def time_left() -> float:
         return max(1.0, deadline - time.perf_counter())
 
-    def tick(spent: float) -> None:
-        nonlocal painted, cost
-        painted, cost = painted + 1, cost + spent
-        step.detail = f"FLUX: {painted} of {total} painted"
-
     async def skyline() -> bytes:
+        nonlocal cost
         prompt = SKYLINE_PROMPT.format(city=place.name, skyline=story["skyline"], condition=now.condition,
                                        time_of_day=rules.time_of_day(now.local_time, now.is_day))
         art = await runpod_ai.paint(http, key, prompt, NEGATIVE_PROMPT, random.randrange(2**31), time_left())
-        tick(art.cost_usd)
+        cost += art.cost_usd
         return sprites.background(art.png)
 
     async def alien(wave: Wave, look: str) -> bytes:
@@ -139,19 +161,26 @@ async def paint_all(http, settings, place, now, waves: list[Wave], story: dict, 
         prompt = ALIEN_PROMPT.format(look=look)
         for _ in range(2):  # one repaint if the first attempt can't be cut out cleanly
             art = await runpod_ai.paint(http, key, prompt, NEGATIVE_PROMPT, random.randrange(2**31), time_left())
+            cost += art.cost_usd  # a rejected painting still costs money
             try:
-                sprite = sprites.cut_out(art.png, wave.colour)
+                return sprites.cut_out(art.png, wave.colour)
             except sprites.BadSprite:
-                cost += art.cost_usd  # a rejected painting still costs money
                 continue
-            tick(art.cost_usd)
-            return sprite
         raise sprites.BadSprite("rejected twice")
+
+    async def deliver(name: str, painting) -> bytes:
+        png = await painting
+        if on_image:
+            on_image(name, png)  # saved first, so the browser can fetch it as soon as it's listed
+        step.result["painted"].append(name)
+        step.cost_usd = round(cost, 4)
+        step.detail = f"FLUX: {len(step.result['painted'])} of {total} painted"
+        return png
 
     step.detail = f"FLUX: 0 of {total} painted"
     jobs = {"skyline.png": skyline()} | {
         f"alien-{w.number}.png": alien(w, a["look"]) for w, a in zip(waves, story["aliens"])}
-    results = await asyncio.gather(*jobs.values(), return_exceptions=True)
+    results = await asyncio.gather(*(deliver(n, p) for n, p in jobs.items()), return_exceptions=True)
     return {name: png for name, png in zip(jobs, results) if isinstance(png, bytes)}, round(cost, 4)
 
 

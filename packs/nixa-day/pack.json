@@ -89,7 +89,20 @@
       "status": "done",
       "detail": "Nixa: afternoon, clear, 19\u00b0C",
       "seconds": 1.3,
-      "cost_usd": 0.0
+      "cost_usd": 0.0,
+      "requests": [
+        "GET https://geocoding-api.open-meteo.com/v1/search?name=Nixa",
+        "GET https://api.open-meteo.com/v1/forecast?latitude=37.04&longitude=-93.29&current=temperature_2m,weather_code,is_day"
+      ],
+      "result": {
+        "city": "Nixa",
+        "region": "Missouri",
+        "country": "United States",
+        "local_time": "2026-11-05T13:15",
+        "time_of_day": "afternoon",
+        "condition": "clear",
+        "temp_c": 18.7
+      }
     },
     {
       "key": "planets",
@@ -97,7 +110,37 @@
       "status": "done",
       "detail": "3358 planets overhead (live NASA data)",
       "seconds": 2.5,
-      "cost_usd": 0.0
+      "cost_usd": 0.0,
+      "requests": [
+        "GET https://exoplanetarchive.ipac.caltech.edu/TAP/sync?format=json&query=select pl_name,hostname,ra,dec,pl_rade,pl_bmasse,pl_eqt,pl_orbper,sy_dist from pscomppars where ra between 184.038 and 304.038 and dec between -22.957 and 90.000 and pl_eqt between 50 and 4500 and pl_rade is not null and sy_dist is not null"
+      ],
+      "result": {
+        "overhead": 3358,
+        "source": "live",
+        "picks": [
+          {
+            "name": "HD 145675 c",
+            "climate": "frozen",
+            "temp_k": 55.51,
+            "light_years": 58,
+            "boss": false
+          },
+          {
+            "name": "TOI-1269 c",
+            "climate": "hot",
+            "temp_k": 767.94,
+            "light_years": 561,
+            "boss": false
+          },
+          {
+            "name": "TOI-2109 b",
+            "climate": "molten",
+            "temp_k": 3646.0,
+            "light_years": 855,
+            "boss": true
+          }
+        ]
+      }
     },
     {
       "key": "species",
@@ -105,7 +148,18 @@
       "status": "done",
       "detail": "Qwen3 32B: Frostskull, Blazehorn, Moltenclaw",
       "seconds": 7.5,
-      "cost_usd": 0.0052
+      "cost_usd": 0.0052,
+      "requests": [
+        "POST https://api.runpod.ai/v2/qwen3-32b-awq/openai/v1/chat/completions  {\"model\": \"Qwen/Qwen3-32B-AWQ\", \"messages\": [...]}"
+      ],
+      "result": {
+        "model": "Qwen3 32B",
+        "species": [
+          "Frostskull",
+          "Blazehorn",
+          "Moltenclaw"
+        ]
+      }
     },
     {
       "key": "art",
@@ -113,7 +167,20 @@
       "status": "done",
       "detail": "FLUX: 4 of 4 painted",
       "seconds": 45.0,
-      "cost_usd": 0.012
+      "cost_usd": 0.012,
+      "requests": [
+        "POST https://api.runpod.ai/v2/black-forest-labs-flux-1-schnell/runsync  \u00d74 in parallel",
+        "GET https://api.runpod.ai/v2/black-forest-labs-flux-1-schnell/status/<job id>  until COMPLETED"
+      ],
+      "result": {
+        "total": 4,
+        "painted": [
+          "skyline.png",
+          "alien-1.png",
+          "alien-2.png",
+          "alien-3.png"
+        ]
+      }
     }
   ],
   "cost_usd": 0.0172

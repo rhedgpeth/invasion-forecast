@@ -89,7 +89,20 @@
       "status": "done",
       "detail": "Tokyo: night, overcast, 14\u00b0C",
       "seconds": 1.4,
-      "cost_usd": 0.0
+      "cost_usd": 0.0,
+      "requests": [
+        "GET https://geocoding-api.open-meteo.com/v1/search?name=Tokyo",
+        "GET https://api.open-meteo.com/v1/forecast?latitude=35.69&longitude=139.69&current=temperature_2m,weather_code,is_day"
+      ],
+      "result": {
+        "city": "Tokyo",
+        "region": "Tokyo",
+        "country": "Japan",
+        "local_time": "2026-11-06T04:15",
+        "time_of_day": "night",
+        "condition": "overcast",
+        "temp_c": 14.2
+      }
     },
     {
       "key": "planets",
@@ -97,7 +110,37 @@
       "status": "done",
       "detail": "654 planets overhead (live NASA data)",
       "seconds": 1.6,
-      "cost_usd": 0.0
+      "cost_usd": 0.0,
+      "requests": [
+        "GET https://exoplanetarchive.ipac.caltech.edu/TAP/sync?format=json&query=select pl_name,hostname,ra,dec,pl_rade,pl_bmasse,pl_eqt,pl_orbper,sy_dist from pscomppars where ra between 56.451 and 176.451 and dec between -24.310 and 90.000 and pl_eqt between 50 and 4500 and pl_rade is not null and sy_dist is not null"
+      ],
+      "result": {
+        "overhead": 654,
+        "source": "live",
+        "picks": [
+          {
+            "name": "G 192-15 c",
+            "climate": "frozen",
+            "temp_k": 55.9,
+            "light_years": 31,
+            "boss": false
+          },
+          {
+            "name": "K2-122 b",
+            "climate": "hot",
+            "temp_k": 769.0,
+            "light_years": 235,
+            "boss": false
+          },
+          {
+            "name": "ITG 15 b",
+            "climate": "molten",
+            "temp_k": 2601.0,
+            "light_years": 445,
+            "boss": true
+          }
+        ]
+      }
     },
     {
       "key": "species",
@@ -105,7 +148,18 @@
       "status": "done",
       "detail": "Qwen3 32B: Frozoraak, Scorchkin, Moltenox",
       "seconds": 8.2,
-      "cost_usd": 0.0053
+      "cost_usd": 0.0053,
+      "requests": [
+        "POST https://api.runpod.ai/v2/qwen3-32b-awq/openai/v1/chat/completions  {\"model\": \"Qwen/Qwen3-32B-AWQ\", \"messages\": [...]}"
+      ],
+      "result": {
+        "model": "Qwen3 32B",
+        "species": [
+          "Frozoraak",
+          "Scorchkin",
+          "Moltenox"
+        ]
+      }
     },
     {
       "key": "art",
@@ -113,7 +167,20 @@
       "status": "done",
       "detail": "FLUX: 4 of 4 painted",
       "seconds": 29.0,
-      "cost_usd": 0.012
+      "cost_usd": 0.012,
+      "requests": [
+        "POST https://api.runpod.ai/v2/black-forest-labs-flux-1-schnell/runsync  \u00d74 in parallel",
+        "GET https://api.runpod.ai/v2/black-forest-labs-flux-1-schnell/status/<job id>  until COMPLETED"
+      ],
+      "result": {
+        "total": 4,
+        "painted": [
+          "skyline.png",
+          "alien-1.png",
+          "alien-2.png",
+          "alien-3.png"
+        ]
+      }
     }
   ],
   "cost_usd": 0.0173

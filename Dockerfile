@@ -18,5 +18,4 @@ RUN useradd --create-home game && mkdir -p data && chown game data
 USER game
 
 EXPOSE 8000
-# --proxy-headers lets the app see players' real addresses behind Runpod's proxy (for the rate limit).
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

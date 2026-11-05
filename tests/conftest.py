@@ -57,7 +57,7 @@ def world(when, overrides: dict | None = None) -> dict:
              "pl_eqt": temp, "pl_orbper": year, "sy_dist": 100.0}
             for name, temp, radius, year in [("Cold b", 80, 2.0, 400), ("Warm b", 500, 4.0, 20),
                                              ("Lava b", 2500, 12.0, 1.2)]]
-    story = {"skyline": "towers and a lattice tower", "aliens": [
+    story = {"aliens": [
         {"species": "Frost Mite", "look": "a pale blue blob"}, {"species": "Dune Crab", "look": "an orange crab"},
         {"species": "Magma Lord", "look": "a glowing lava giant"}]}
     routes = {

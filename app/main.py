@@ -68,6 +68,11 @@ class Limits:
         self.last_start[player], self.count = now, self.count + 1
         return None
 
+    def refund(self, player: str) -> None:
+        """A game that failed before spending anything doesn't count, so TRY AGAIN works straight away."""
+        self.last_start.pop(player, None)
+        self.count = max(0, self.count - 1)
+
 
 def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
@@ -96,7 +101,8 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
     @app.post("/api/invasions", status_code=202)
     async def start_invasion(body: InvasionRequest, request: Request, simulate: str = ""):
         state = request.app.state
-        if blocked := state.limits.check(player_ip(request)):
+        player = player_ip(request)
+        if blocked := state.limits.check(player):
             code, wait = blocked
             message = (f"One invasion every {SECONDS_BETWEEN_GAMES} seconds. Next coin in {wait} s."
                        if code == "too_fast" else "Today's invasions are used up. Come back tomorrow.")
@@ -106,7 +112,7 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
         state.jobs[job.id] = job
         while len(state.jobs) > MAX_JOBS_KEPT:
             state.jobs.pop(next(iter(state.jobs)))
-        job.task = asyncio.create_task(run_job(state, job, body.city.strip(), faults))
+        job.task = asyncio.create_task(run_job(state, job, body.city.strip(), faults, player))
         return {"id": job.id, "poll": f"/api/invasions/{job.id}"}
 
     @app.get("/api/invasions/{job_id}")
@@ -133,7 +139,7 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
     return app
 
 
-async def run_job(state, job: Job, city: str, faults: frozenset) -> None:
+async def run_job(state, job: Job, city: str, faults: frozenset, player: str = "") -> None:
     folder = state.settings.data_dir / "games" / job.id
 
     def on_image(name: str, png: bytes) -> None:  # each image is served as soon as it's painted
@@ -160,12 +166,21 @@ async def run_job(state, job: Job, city: str, faults: frozenset) -> None:
         log.exception("invasion %s crashed", job.id)
         job.error = {"code": "internal", "message": "Something went wrong on our side. Please try again."}
     job.status = "failed"
+    if job.error["code"] in ("city_not_found", "no_planets", "weather_down"):
+        state.limits.refund(player)  # failed in step 1 or 2: nothing was spent
 
 
 def player_ip(request: Request) -> str:
-    """Behind Runpod's proxy every request comes from the proxy; the player's address is in X-Forwarded-For."""
-    forwarded = request.headers.get("x-forwarded-for", "")
-    return forwarded.split(",")[0].strip() or (request.client.host if request.client else "unknown")
+    """The player's real address, for the rate limit.
+
+    Runpod's proxy sits behind Cloudflare, which sets CF-Connecting-IP to the real client address (and overwrites
+    any value a client sends). X-Forwarded-For can be forged by the client, so only its last hop, the one a proxy
+    added, is used as a fallback.
+    """
+    if cf := request.headers.get("cf-connecting-ip", "").strip():
+        return cf
+    hops = [h.strip() for h in request.headers.get("x-forwarded-for", "").split(",") if h.strip()]
+    return hops[-1] if hops else (request.client.host if request.client else "unknown")
 
 
 def error(status: int, code: str, message: str, retry_after: int | None = None) -> JSONResponse:

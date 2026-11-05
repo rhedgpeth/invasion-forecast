@@ -94,12 +94,16 @@ function coolDown(form, errorEl, error, seconds) {
 // ---------- 2. Follow the backend, step by step ----------
 
 async function follow(url, city, render) {
+  let misses = 0;
   for (;;) {
     let job;
     try {
       job = await (await fetch(url)).json();
+      misses = 0;
     } catch {
-      await sleep(POLL_MS); // a dropped poll is harmless: ask again
+      // A dropped poll is harmless: ask again. After ~30 s of silence, stop and say so.
+      if (++misses >= 20) return showError("NO SIGNAL", "Lost contact with the game server. Please try again.", city);
+      await sleep(POLL_MS);
       continue;
     }
     if (!job.status) return showError("INVASION LOST", job.error?.message || "That invasion expired.", city);
@@ -110,7 +114,8 @@ async function follow(url, city, render) {
       return ready(city);
     }
     if (job.status === "failed") {
-      return showError(ERROR_TITLES[job.error.code] || "INVASION ABORTED", job.error.message, city);
+      const retryable = job.error.code !== "city_not_found"; // retrying a misspelt city can't help
+      return showError(ERROR_TITLES[job.error.code] || "INVASION ABORTED", job.error.message, city, retryable);
     }
     await sleep(POLL_MS);
   }
@@ -300,12 +305,13 @@ function showOver(saved) {
 
 // ---------- 6. Errors ----------
 
-function showError(title, message, city) {
+function showError(title, message, city, retryable = true) {
   $("error-title").textContent = title;
   $("error-message").textContent = message;
   lastCity = city || lastCity;
+  $("error-retry").hidden = !retryable;
   show("error");
-  $("error-retry").focus();
+  $(retryable ? "error-retry" : "error-home").focus();
 }
 
 $("error-retry").addEventListener("click", () => {

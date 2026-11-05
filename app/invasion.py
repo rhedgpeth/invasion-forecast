@@ -111,7 +111,7 @@ async def run_invasion(http: httpx.AsyncClient, settings: Settings, city: str, p
 
 async def plan_waves(http, settings: Settings, progress: Progress, place, now, when, faults):
     """Steps 2 and 3: which planets are invading, and what their species are like."""
-    # 2. Planets. Falls back to the bundled catalogue inside planets.overhead().
+    # 2. Planets. Falls back to the saved catalogue inside planets.overhead().
     with running(progress.step("planets")) as step:
         lst = planets.sidereal_degrees(when, place.lon)
         step.requests = [f"GET {planets.TAP_URL}?format=json&query={planets.window_query(place.lat, lst)}"]
@@ -139,7 +139,7 @@ async def plan_waves(http, settings: Settings, progress: Progress, place, now, w
                 step.cost_usd = round(step.cost_usd + writing.cost_usd, 4)
                 story = parse_story(writing.text, len(waves))
                 break
-            except (UpstreamError, ValueError, KeyError) as e:
+            except Exception as e:  # any failure or malformed answer: retry, then fall back (never crash the game)
                 problem = str(e) if isinstance(e, UpstreamError) else f"unusable answer ({type(e).__name__})"
                 log.warning("species attempt %d failed: %s", attempt + 1, problem)
                 if "llm_down" in faults or time.perf_counter() - started > 20:
@@ -177,7 +177,7 @@ class Artist:
         prompt = SKYLINE_PROMPT.format(city=place.name, where=", ".join(p for p in (place.region, place.country) if p),
                                        scale=city_scale(place.population), condition=now.condition,
                                        time_of_day=rules.time_of_day(now.local_time, now.is_day))
-        # It starts early, so it gets the alien deadline plus the time steps 2 and 3 take.
+        # It starts first, so it gets the alien deadline plus 20 s.
         return sprites.background(await self.paint(prompt, self.started + self.settings.art_deadline_s + 20))
 
     async def alien(self, wave: Wave, look: str, deadline_at: float) -> bytes:

@@ -35,7 +35,7 @@ One request, four steps. All of them live in [`app/invasion.py`](app/invasion.py
 | Step | Service | What it does | If it fails |
 |---|---|---|---|
 | 1. Sky | **Open-Meteo** (free) | Finds the city, and reads its weather and day or night right now | The game can't start: a clear error and a retry button |
-| 2. Planets | **NASA Exoplanet Archive** (free) | Works out which patch of sky is overhead from the city's position and the exact time, then asks NASA which planets orbit stars in it | Uses a bundled copy of the catalogue; same maths, same game |
+| 2. Planets | **NASA Exoplanet Archive** (free) | Works out which patch of sky is overhead from the city's position and the exact time, then asks NASA which planets orbit stars in it | Uses the saved catalogue in the repo; same maths, same game |
 | 3. Species | **Qwen3 32B** on Runpod | Invents a species for each planet (name, shape, bio) from its real data | Retries once, then uses built-in descriptions |
 | 4. Art | **FLUX.1 Schnell** on Runpod | Paints the city's skyline in its current weather, and each alien as a pixel-art stencil | Anything not painted within 60 s becomes a silhouette |
 
@@ -53,10 +53,11 @@ You need Python 3.13+ (or Docker) and a [Runpod API key](https://console.runpod.
 ```bash
 git clone https://github.com/rhedgpeth/invasion-forecast && cd invasion-forecast
 python -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt        # Windows: .venv\Scripts\pip ...
-cp .env.example .env                                  # then put your key in .env
+source .venv/bin/activate                    # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+cp .env.example .env                         # Windows: copy .env.example .env   (then put your key in .env)
 
-.venv/bin/uvicorn app.main:app --env-file .env        # → http://127.0.0.1:8000
+uvicorn app.main:app --env-file .env         # → http://127.0.0.1:8000
 ```
 
 Or with Docker, exactly as it runs on Runpod:
@@ -68,17 +69,18 @@ docker run --rm -p 8000:8000 --env-file .env invasion-forecast
 
 Two saved invasions ship in [`packs/`](packs/), so the game is playable without a key or a network.
 
-**Useful extras**
+**Useful extras** (with the virtual environment activated)
 
 - `python -m app Tokyo` prints the sky and the planets invading Tokyo right now. It's free: no Runpod calls.
-- `python -m app Tokyo --save packs/tokyo-night` makes a full invasion and saves it as a pack (about 2 cents).
+- `python -m app Tokyo --save packs/tokyo-night` makes a full invasion and saves it as a pack (about 2 cents). It reads
+  `RUNPOD_API_KEY` from your environment, not from `.env`, so set it first.
 - `/?replay=tokyo-night` replays a saved invasion's loading map. It's a good demo backup if the GPU is slow.
 - With `DEMO_FAULTS=1`, `/?simulate=gpu_down` (or `nasa_down`, `llm_down`, `weather_down`) shows each failure live.
 
 **Tests** run offline with every external service faked, so they need no key and spend no credit:
 
 ```bash
-.venv/bin/pytest
+pytest
 ```
 
 ## Configuration
@@ -106,7 +108,12 @@ Runpod Public Endpoints, so there's no GPU to rent for the server.
    hour:
    - Expose HTTP port `8000`.
    - Set the environment variable `RUNPOD_API_KEY` to `{{ RUNPOD_SECRET_invasion_forecast_key }}`.
+   - Optional: set `DEMO_FAULTS` to `1` to allow the `?simulate=` failure demos.
 4. **Open** `https://<pod-id>-8000.proxy.runpod.net`.
+
+To ship a change, build and push a new tag (for example `:1.1`), then point the Pod at it: **Edit Pod** → container
+image in the console, or `PATCH https://rest.runpod.io/v1/pods/<pod-id>` with `{"imageName": "…:1.1"}`. The Pod
+restarts with the new image and keeps its URL.
 
 Prefer the API? The same Pod is one `POST https://rest.runpod.io/v1/pods` with `"computeType": "CPU"`,
 `"imageName"`, `"ports": ["8000/http"]` and the `env` above.
@@ -119,7 +126,7 @@ that long: the browser starts a job, then checks its progress every 1.5 s.
 | Service | Cost | Published limits | How the game stays inside them |
 |---|---|---|---|
 | [Open-Meteo](https://open-meteo.com/en/terms) | Free, no key; non-commercial use, CC BY 4.0 (credited in the game) | 600/min, 5,000/hour, 10,000/day | 2 calls per game; the daily game cap keeps it under 500 a day |
-| [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/docs/TAP/usingTAP.html) | Free, no key | None published | 1 small query per game, an 8 s timeout, and a bundled snapshot fallback |
+| [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/docs/TAP/usingTAP.html) | Free, no key | None published | 1 small query per game, an 8 s timeout, and the saved catalogue as a fallback |
 | Runpod Qwen3 32B | $10 per million tokens | Pay per use | About 800 tokens a game: under 1 cent |
 | Runpod FLUX.1 Schnell | $0.003 per image (measured) | Pay per use | 4 images a game: about 1.2 cents |
 | Runpod CPU Pod (hosting) | $0.06 an hour | — | About $1.44 a day while it's running |
@@ -132,7 +139,9 @@ day of games, plus hosting.
 **Rate limits**
 - Each player can start one game every 20 seconds. Faster requests get `429` with `Retry-After`, and the button
   counts down.
-- Behind Runpod's proxy, the player's real address comes from `X-Forwarded-For`.
+- The player's address comes from `CF-Connecting-IP`, which Cloudflare (in front of Runpod's proxy) sets and
+  clients can't forge. A forged `X-Forwarded-For` doesn't help.
+- A game that fails before spending anything (an unknown city, say) doesn't count, so retrying works straight away.
 - After `MAX_GAMES_PER_DAY` games, new games get `429` until midnight UTC.
 - If Open-Meteo rate-limits us, the player sees a clear error and can retry. Its limits are far above what the cap
   allows.
@@ -189,7 +198,7 @@ The first step is moving FLUX to a dedicated Runpod Serverless worker, for a fas
 - **One Pod, no autoscaling.** That's fine for a demo; heavy traffic would need Serverless or more Pods.
 - **Painting time varies a lot** on the shared FLUX endpoint (25–60 s). Late images become silhouettes.
 - **Keyboard only.** No touch controls yet.
-- **The bundled planet catalogue** is refreshed by hand (`python -m app.planets`).
+- **The saved planet catalogue** is refreshed by hand (`python -m app.planets`).
 
 ## Suggested docs improvements
 
@@ -200,7 +209,8 @@ image URL coming back in `output.result`. How the game handles each, and a doc c
 ## How AI was used
 
 - **Building it:** I built this with Claude Code (Anthropic) as a pair programmer. It helped brainstorm and
-  stress-test the concept (including independent model reviews), and wrote code and tests at my direction. I made
+  stress-test the concept (I had it review the idea against the brief and rubric before building), and wrote code and
+  tests at my direction. I made
   the design decisions, reviewed the work, and played and tested every step.
 - **In the game:** an LLM (Qwen3 32B) writes the alien species, and an image model (FLUX.1 Schnell) paints the art,
   both on Runpod. The weather, the planets and the game rules are real data and plain code.

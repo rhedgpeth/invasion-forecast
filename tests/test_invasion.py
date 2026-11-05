@@ -89,10 +89,17 @@ async def test_llm_down_uses_built_in_descriptions():
 
 
 @pytest.mark.anyio
-async def test_llm_nonsense_also_uses_built_in_descriptions():
-    nonsense = (200, {"choices": [{"message": {"content": "Sure! Here are some aliens."}}]})
-    _, steps = await invade({f"{runpod_ai.BASE_URL}/{runpod_ai.LLM_ENDPOINT}/": nonsense})
+@pytest.mark.parametrize("reply", [
+    {"choices": [{"message": {"content": "Sure! Here are some aliens."}}]},  # not JSON
+    {"choices": [{"message": {"content": None}}]},  # empty message
+    {"choices": []},  # no answer at all
+    {"choices": [{"message": {"content": '{"aliens": ["a", "b", "c"]}'}}]},  # wrong shape
+    {"choices": [{"message": {"content": "[1, 2, 3]"}}]},  # a list, not an object
+])
+async def test_any_malformed_llm_answer_falls_back_instead_of_crashing(reply):
+    game, steps = await invade({f"{runpod_ai.BASE_URL}/{runpod_ai.LLM_ENDPOINT}/": (200, reply)})
     assert steps["species"].status == "fallback"
+    assert len(game.pack["waves"]) == 3
 
 
 @pytest.mark.anyio

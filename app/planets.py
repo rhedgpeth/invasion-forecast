@@ -4,7 +4,7 @@
 1. Ask NASA only for the patch of sky around this place's meridian, so the answer is small and fast.
 2. Work out each star's exact altitude here and now, and keep the ones at least 30 degrees up.
 
-If NASA is down, the same maths runs on a bundled snapshot of the catalogue, so the game still plays.
+If NASA is down, the same maths runs on a saved copy of the catalogue (planets_snapshot.json), so the game still plays.
 """
 import asyncio
 import json
@@ -74,6 +74,8 @@ async def overhead(http: httpx.AsyncClient, lat: float, lon: float, when: dateti
             raise UpstreamError("nasa", "simulated outage")
         rows = await request_json(http, "nasa", "GET", TAP_URL, timeout=NASA_TIMEOUT_S,
                                   params={"query": window_query(lat, lst), "format": "json"})
+        if not isinstance(rows, list):
+            raise UpstreamError("nasa", "answered with something other than a list of planets")
         source = "live"
     except UpstreamError:
         rows, source = load_snapshot(), "snapshot"
@@ -97,7 +99,7 @@ def load_snapshot() -> list[dict]:
 
 
 async def refresh_snapshot() -> int:
-    """Download the whole (filtered) catalogue into the bundled snapshot. Run: python -m app.planets"""
+    """Download the whole (filtered) catalogue into the saved copy. Run: python -m app.planets"""
     async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}, timeout=90) as http:
         rows = await get_json(http, "nasa", TAP_URL,
                               query=f"select {','.join(COLUMNS)} from pscomppars where {QUALITY}", format="json")

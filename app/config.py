@@ -34,11 +34,10 @@ class CityNotFound(Exception):
 class UpstreamError(Exception):
     """An external service failed. `service` says which one, so callers can decide what to do."""
 
-    def __init__(self, service: str, message: str, status: int | None = None, retry_after: int | None = None):
+    def __init__(self, service: str, message: str, status: int | None = None):
         super().__init__(f"{service}: {message}")
         self.service = service
         self.status = status
-        self.retry_after = retry_after
 
 
 async def get_json(http: httpx.AsyncClient, service: str, url: str, **params) -> object:
@@ -55,9 +54,7 @@ async def request_json(http: httpx.AsyncClient, service: str, method: str, url: 
     except httpx.HTTPError as e:
         raise UpstreamError(service, f"unreachable ({type(e).__name__})") from e
     if resp.status_code >= 400:
-        retry = resp.headers.get("Retry-After", "")
-        raise UpstreamError(service, f"HTTP {resp.status_code}", resp.status_code,
-                            int(retry) if retry.isdigit() else None)
+        raise UpstreamError(service, f"HTTP {resp.status_code}", resp.status_code)
     try:
         return resp.json()
     except ValueError as e:

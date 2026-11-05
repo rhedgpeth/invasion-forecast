@@ -47,7 +47,14 @@ async def test_live_answer_keeps_only_stars_high_enough():
 
 
 @pytest.mark.anyio
-async def test_nasa_outage_falls_back_to_the_bundled_snapshot():
+async def test_an_odd_nasa_answer_also_uses_the_saved_catalogue():
+    async with fake_http({planets.TAP_URL: (200, {"error": "unexpected"})}) as http:
+        found = await planets.overhead(http, 37.0, -93.3, datetime(2026, 11, 5, 18, tzinfo=timezone.utc))
+    assert found.source == "snapshot" and found.planets
+
+
+@pytest.mark.anyio
+async def test_nasa_outage_falls_back_to_the_saved_catalogue():
     # This really happened while building the game: every TAP call returned an HTML 503 page.
     async with fake_http({planets.TAP_URL: (503, "<html>Service Unavailable</html>")}) as http:
         found = await planets.overhead(http, 37.0, -93.3, datetime(2026, 11, 5, 18, tzinfo=timezone.utc))

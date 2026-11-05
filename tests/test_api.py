@@ -61,13 +61,36 @@ def test_weather_outage_fails_with_a_retry_message(client):
 
 def test_players_are_rate_limited_by_their_real_address(client):
     with client() as c:
-        alice = {"X-Forwarded-For": "203.0.113.7, 10.0.0.1"}
+        alice = {"CF-Connecting-IP": "203.0.113.7"}
         assert c.post("/api/invasions", json={"city": "Tokyo"}, headers=alice).status_code == 202
         again = c.post("/api/invasions", json={"city": "Tokyo"}, headers=alice)
         assert again.status_code == 429 and again.json()["error"]["code"] == "too_fast"
         assert 0 < int(again.headers["Retry-After"]) <= SECONDS_BETWEEN_GAMES
-        bob = {"X-Forwarded-For": "198.51.100.4"}
+        bob = {"CF-Connecting-IP": "198.51.100.4"}
         assert c.post("/api/invasions", json={"city": "Tokyo"}, headers=bob).status_code == 202
+
+
+def test_a_forged_forwarded_header_cannot_dodge_the_limit(client):
+    with client() as c:
+        alice = {"CF-Connecting-IP": "203.0.113.7"}
+        assert c.post("/api/invasions", json={"city": "Tokyo"}, headers=alice).status_code == 202
+        forged = alice | {"X-Forwarded-For": "1.2.3.4"}
+        assert c.post("/api/invasions", json={"city": "Tokyo"}, headers=forged).status_code == 429
+
+
+def test_without_cloudflare_only_the_last_forwarded_hop_counts(client):
+    with client() as c:
+        first = {"X-Forwarded-For": "1.2.3.4, 10.0.0.9"}
+        assert c.post("/api/invasions", json={"city": "Tokyo"}, headers=first).status_code == 202
+        forged = {"X-Forwarded-For": "5.6.7.8, 10.0.0.9"}  # client changed its own part; the proxy's hop is the same
+        assert c.post("/api/invasions", json={"city": "Tokyo"}, headers=forged).status_code == 429
+
+
+def test_a_game_that_fails_before_spending_anything_does_not_count(client):
+    with client(routes={sky.GEOCODE_URL: (200, {"generationtime_ms": 0.3})}) as c:
+        first = c.post("/api/invasions", json={"city": "Atlantiss"})
+        assert wait_for(c, first.json()["id"])["error"]["code"] == "city_not_found"
+        assert c.post("/api/invasions", json={"city": "Atlantis"}).status_code == 202  # no 20 s wait
 
 
 def test_daily_cap_protects_the_credit():

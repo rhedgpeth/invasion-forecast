@@ -4,10 +4,10 @@ Both are ready-made models you call over HTTPS with your API key. You pay per ca
 
     POST https://api.runpod.ai/v2/<endpoint>/...      Authorization: Bearer $RUNPOD_API_KEY
 
-Three behaviours we measured that the docs don't mention (see docs/runpod-docs-feedback.md):
-  1. `runsync` can return while the job is still IN_QUEUE / IN_PROGRESS, so you must poll /status/<id>.
-  2. FLUX returns the image URL in `output.result` (the docs say `output.image_url`). We accept both.
-  3. FLUX images took 20-31 s and always came back 1024x1024, whatever width and height we asked for.
+Good to know when calling the image endpoint (more in docs/runpod-docs-feedback.md):
+  1. `runsync` can return while the job is still IN_QUEUE / IN_PROGRESS, so poll /status/<id> until it's done.
+  2. The image URL comes back in `output.result` (the example response shows `output.image_url`). We read both.
+  3. Images take 15-60 s and come back 1024x1024, so start early and resize in code.
 """
 import asyncio
 import re

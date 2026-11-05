@@ -191,10 +191,10 @@ The first step is moving FLUX to a dedicated Runpod Serverless worker, for a fas
 - **Keyboard only.** No touch controls yet.
 - **The bundled planet catalogue** is refreshed by hand (`python -m app.planets`).
 
-## Runpod docs feedback
+## Suggested docs improvements
 
-Building this turned up four places where the Public Endpoint docs and the live API differ, such as the image URL
-being in `output.result`, not `output.image_url`. Details and suggested fixes are in
+Building this turned up four small things a developer meets in their first hour with the image endpoint, such as the
+image URL coming back in `output.result`. How the game handles each, and a doc change for each, are in
 [docs/runpod-docs-feedback.md](docs/runpod-docs-feedback.md).
 
 ## How AI was used

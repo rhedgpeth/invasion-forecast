@@ -169,13 +169,27 @@ tests/              offline tests, including one per failure
 docs/               Runpod docs feedback, screenshots
 ```
 
-## What I'd do next
+## Where this is going
 
-- **Run FLUX on our own Runpod Serverless worker.** A warm, dedicated worker should cut the 25–60 s of painting
-  dramatically, and it would let us pin the image size.
-- Cache games per city and hour, so a busy booth reuses work.
-- Add touch controls for phones, and a high-score table.
-- Refresh the bundled planet snapshot automatically.
+Invasion Forecast is meant as the first game in a **Runpod Arcade**: one small game per Runpod choice, so developers
+learn each one by playing it.
+
+| Game | The Runpod choice it teaches |
+|---|---|
+| Invasion Forecast (this repo) | Public Endpoints: ready-made models, pay per call |
+| A Serverless game | Serverless vs Pods: scale to zero, cold vs warm workers |
+| A GPU-choice game | Picking a GPU: speed vs memory vs cost per run |
+| A voice game | Other model types: speech in, speech out |
+
+The first step is moving FLUX to a dedicated Runpod Serverless worker, for a faster, steadier wait.
+
+## Known limitations
+
+- **Games in progress live in memory.** A restart of the Pod drops games still being built (saved games are on disk).
+- **One Pod, no autoscaling.** That's fine for a demo; heavy traffic would need Serverless or more Pods.
+- **Painting time varies a lot** on the shared FLUX endpoint (25–60 s). Late images become silhouettes.
+- **Keyboard only.** No touch controls yet.
+- **The bundled planet catalogue** is refreshed by hand (`python -m app.planets`).
 
 ## Runpod docs feedback
 
